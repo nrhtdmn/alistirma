@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 
 type Tool = 'pen' | 'eraser';
 
+/**
+ * Kalıcı çizim alanı.
+ * Tuval yalnızca silgi ile dokunulunca silinir; yeniden çizim / resize içeriği bozmaz.
+ */
 export function DrawingPad({
   value,
   onChange,
@@ -16,9 +20,13 @@ export function DrawingPad({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
+  const toolRef = useRef<Tool>('pen');
+  const seeded = useRef(false);
   const [tool, setTool] = useState<Tool>('pen');
-  const [color, setColor] = useState('#15231f');
-  const [width, setWidth] = useState(3);
+
+  useEffect(() => {
+    toolRef.current = tool;
+  }, [tool]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -26,58 +34,54 @@ export function DrawingPad({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const resize = () => {
-      const parent = canvas.parentElement;
-      const w = parent?.clientWidth || 600;
-      const ratio = window.devicePixelRatio || 1;
-      const prev = canvas.toDataURL();
-      canvas.width = Math.floor(w * ratio);
-      canvas.height = Math.floor(height * ratio);
-      canvas.style.width = `${w}px`;
+    const parent = canvas.parentElement;
+    const cssW = Math.max(280, parent?.clientWidth || 600);
+    const ratio = window.devicePixelRatio || 1;
+
+    // Boyut zaten doğruysa dokunma
+    const targetW = Math.floor(cssW * ratio);
+    const targetH = Math.floor(height * ratio);
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      const snapshot =
+        canvas.width > 0 && canvas.height > 0 ? canvas.toDataURL('image/png') : '';
+      canvas.width = targetW;
+      canvas.height = targetH;
+      canvas.style.width = `${cssW}px`;
       canvas.style.height = `${height}px`;
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      // background
-      ctx.fillStyle = '#fbfdfb';
-      ctx.fillRect(0, 0, w, height);
-      // grid for math
-      ctx.strokeStyle = '#e2ebe6';
-      ctx.lineWidth = 1;
-      for (let y = 32; y < height; y += 32) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
-        ctx.stroke();
-      }
-      if (value || prev) {
-        const img = new Image();
-        img.onload = () => ctx.drawImage(img, 0, 0, w, height);
-        img.src = value || prev;
-      }
-    };
 
-    resize();
-    window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
+      // Beyaz zemin (ızgara CSS'te)
+      ctx.fillStyle = '#fbfdfb';
+      ctx.fillRect(0, 0, cssW, height);
+
+      const restoreSrc = snapshot || value || '';
+      if (restoreSrc) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0, cssW, height);
+          seeded.current = true;
+        };
+        img.src = restoreSrc;
+      } else {
+        seeded.current = true;
+      }
+    } else if (!seeded.current && value) {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, cssW, height);
+        seeded.current = true;
+      };
+      img.src = value;
+    } else if (!seeded.current) {
+      seeded.current = true;
+    }
+    // value değişince tuvali yeniden boyama — bilinçli olarak yok
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [height]);
 
-  useEffect(() => {
-    if (!value || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    const img = new Image();
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, w, h);
-    };
-    img.src = value;
-  }, [value]);
-
-  function pos(e: PointerEvent | React.PointerEvent) {
+  function pos(e: React.PointerEvent) {
     const canvas = canvasRef.current!;
     const rect = canvas.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -86,10 +90,30 @@ export function DrawingPad({
   function start(e: React.PointerEvent) {
     e.preventDefault();
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
     canvas.setPointerCapture(e.pointerId);
     drawing.current = true;
-    last.current = pos(e);
+    const p = pos(e);
+    last.current = p;
+
+    // Tek dokunuşta nokta da kalsın
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 0.1, 0, Math.PI * 2);
+    applyStrokeStyle(ctx);
+    ctx.stroke();
+  }
+
+  function applyStrokeStyle(ctx: CanvasRenderingContext2D) {
+    if (toolRef.current === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+      ctx.lineWidth = 18;
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = '#15231f';
+      ctx.lineWidth = 3;
+    }
   }
 
   function move(e: React.PointerEvent) {
@@ -101,15 +125,7 @@ export function DrawingPad({
     ctx.beginPath();
     ctx.moveTo(last.current.x, last.current.y);
     ctx.lineTo(p.x, p.y);
-    if (tool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.strokeStyle = 'rgba(0,0,0,1)';
-      ctx.lineWidth = width * 4;
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = color;
-      ctx.lineWidth = width;
-    }
+    applyStrokeStyle(ctx);
     ctx.stroke();
     last.current = p;
   }
@@ -119,6 +135,8 @@ export function DrawingPad({
     drawing.current = false;
     last.current = null;
     const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (ctx) ctx.globalCompositeOperation = 'source-over';
     if (!canvas) return;
     try {
       canvas.releasePointerCapture(e.pointerId);
@@ -126,26 +144,6 @@ export function DrawingPad({
       /* ignore */
     }
     onChange(canvas.toDataURL('image/png'));
-  }
-
-  function clear() {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    const w = canvas.clientWidth;
-    const h = canvas.clientHeight;
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = '#fbfdfb';
-    ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = '#e2ebe6';
-    ctx.lineWidth = 1;
-    for (let y = 32; y < h; y += 32) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-    onChange('');
   }
 
   return (
@@ -167,26 +165,6 @@ export function DrawingPad({
           >
             Silgi
           </button>
-          <input
-            type="color"
-            value={color}
-            onChange={(e) => setColor(e.target.value)}
-            title="Renk"
-            className="color-pick"
-          />
-          <label className="tiny inline-field">
-            Kalınlık
-            <input
-              type="range"
-              min={1}
-              max={12}
-              value={width}
-              onChange={(e) => setWidth(Number(e.target.value))}
-            />
-          </label>
-          <button type="button" className="btn btn--small btn--ghost" onClick={clear}>
-            Temizle
-          </button>
         </div>
       </div>
       <canvas
@@ -195,10 +173,11 @@ export function DrawingPad({
         onPointerDown={start}
         onPointerMove={move}
         onPointerUp={end}
-        onPointerLeave={end}
         onPointerCancel={end}
       />
-      <p className="tiny muted">Parmak, kalem (stylus) veya fare ile yazabilirsiniz.</p>
+      <p className="tiny muted">
+        Yazı kalır. Yalnızca Silgi seçiliyken dokununca silinir.
+      </p>
     </div>
   );
 }
