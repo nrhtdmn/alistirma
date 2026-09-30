@@ -1,0 +1,252 @@
+export type UserRole = 'ogretmen' | 'ogrenci' | 'veli' | 'diger';
+
+export type ItemType = 'alistirma' | 'sinav' | 'test' | 'quiz' | 'kartlar';
+
+export type QuestionType =
+  | 'coktan_secmeli'
+  | 'dogru_yanlis'
+  | 'bosluk_doldurma'
+  | 'acik_uclu'
+  | 'eslestirme'
+  | 'siralama'
+  | 'matematik';
+
+export type SubjectKey =
+  | 'turkce'
+  | 'matematik'
+  | 'fen'
+  | 'sosyal'
+  | 'ingilizce'
+  | 'almanca'
+  | 'fransizca'
+  | 'tarih'
+  | 'cografya'
+  | 'biyoloji'
+  | 'fizik'
+  | 'kimya'
+  | 'felsefe'
+  | 'din'
+  | 'muzik'
+  | 'resim'
+  | 'beden'
+  | 'bilgisayar'
+  | 'ekonomi'
+  | 'psikoloji'
+  | 'diger';
+
+export interface User {
+  id: string;
+  name: string;
+  role: UserRole;
+  color: string;
+  createdAt: number;
+}
+
+export interface Folder {
+  id: string;
+  parentId: string | null;
+  name: string;
+  ownerId: string;
+  color: string;
+  order: number;
+  createdAt: number;
+}
+
+export interface ChoiceOption {
+  id: string;
+  text: string;
+  isCorrect?: boolean;
+}
+
+export interface MatchPair {
+  id: string;
+  left: string;
+  right: string;
+}
+
+export interface Question {
+  id: string;
+  type: QuestionType;
+  prompt: string;
+  points: number;
+  explanation?: string;
+  /** Çoktan seçmeli / doğru-yanlış */
+  options?: ChoiceOption[];
+  /** Boşluk doldurma / açık uçlu / matematik kabul edilen cevaplar */
+  acceptedAnswers?: string[];
+  caseSensitive?: boolean;
+  /** Eşleştirme */
+  pairs?: MatchPair[];
+  /** Sıralama */
+  orderItems?: string[];
+  /** Matematik: LaTeX gösterimi */
+  latex?: string;
+  /** Görsel (base64) opsiyonel */
+  imageData?: string;
+}
+
+export interface ItemSettings {
+  shuffleQuestions: boolean;
+  shuffleOptions: boolean;
+  showResultsImmediately: boolean;
+  timeLimitMinutes: number | null;
+  passScorePercent: number;
+  allowReview: boolean;
+}
+
+export interface FlashCard {
+  id: string;
+  /** Ön yüz — kelime / soru */
+  front: string;
+  /** Arka yüz — anlam / cevap */
+  back: string;
+  /** Örnek cümle (isteğe bağlı) */
+  example?: string;
+  /** Telaffuz / ipucu */
+  hint?: string;
+}
+
+export interface ContentItem {
+  id: string;
+  folderId: string | null;
+  ownerId: string;
+  type: ItemType;
+  title: string;
+  description: string;
+  subject: SubjectKey;
+  gradeLevel: string;
+  questions: Question[];
+  /** Kelime kartları (type === 'kartlar') */
+  cards?: FlashCard[];
+  settings: ItemSettings;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AnswerRecord {
+  questionId: string;
+  /** string | string[] | Record matching answers */
+  value: unknown;
+  isCorrect: boolean | null;
+  pointsEarned: number;
+  feedback?: string;
+}
+
+export interface Attempt {
+  id: string;
+  itemId: string;
+  userId: string;
+  answers: AnswerRecord[];
+  score: number;
+  maxScore: number;
+  percent: number;
+  durationSeconds: number;
+  startedAt: number;
+  completedAt: number;
+}
+
+export interface AppMeta {
+  id: string;
+  currentUserId: string | null;
+  lastBackupAt: number | null;
+}
+
+export interface ExportBundle {
+  version: 1;
+  exportedAt: number;
+  app: string;
+  users?: User[];
+  folders?: Folder[];
+  items?: ContentItem[];
+  attempts?: Attempt[];
+}
+
+export const DEFAULT_SETTINGS: ItemSettings = {
+  shuffleQuestions: false,
+  shuffleOptions: false,
+  showResultsImmediately: true,
+  timeLimitMinutes: null,
+  passScorePercent: 50,
+  allowReview: true,
+};
+
+export const ROLE_LABELS: Record<UserRole, string> = {
+  ogretmen: 'Öğretmen',
+  ogrenci: 'Öğrenci',
+  veli: 'Veli',
+  diger: 'Diğer',
+};
+
+export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
+  alistirma: 'Alıştırma',
+  sinav: 'Sınav',
+  test: 'Test',
+  quiz: 'Quiz',
+  kartlar: 'Kelime kartları',
+};
+
+export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  coktan_secmeli: 'Çoktan seçmeli',
+  dogru_yanlis: 'Doğru / Yanlış',
+  bosluk_doldurma: 'Boşluk doldurma',
+  acik_uclu: 'Açık uçlu',
+  eslestirme: 'Eşleştirme',
+  siralama: 'Sıralama',
+  matematik: 'Matematik',
+};
+
+export const SUBJECT_LABELS: Record<SubjectKey, string> = {
+  turkce: 'Türkçe',
+  matematik: 'Matematik',
+  fen: 'Fen Bilimleri',
+  sosyal: 'Sosyal Bilgiler',
+  ingilizce: 'İngilizce',
+  almanca: 'Almanca',
+  fransizca: 'Fransızca',
+  tarih: 'Tarih',
+  cografya: 'Coğrafya',
+  biyoloji: 'Biyoloji',
+  fizik: 'Fizik',
+  kimya: 'Kimya',
+  felsefe: 'Felsefe',
+  din: 'Din Kültürü',
+  muzik: 'Müzik',
+  resim: 'Görsel Sanatlar',
+  beden: 'Beden Eğitimi',
+  bilgisayar: 'Bilişim',
+  ekonomi: 'Ekonomi',
+  psikoloji: 'Psikoloji',
+  diger: 'Diğer',
+};
+
+export const GRADE_LEVELS = [
+  '1. Sınıf',
+  '2. Sınıf',
+  '3. Sınıf',
+  '4. Sınıf',
+  '5. Sınıf',
+  '6. Sınıf',
+  '7. Sınıf',
+  '8. Sınıf',
+  '9. Sınıf',
+  '10. Sınıf',
+  '11. Sınıf',
+  '12. Sınıf',
+  'Lise Hazırlık',
+  'Önlisans',
+  'Lisans',
+  'Yüksek Lisans',
+  'Doktora',
+  'Genel / Her seviye',
+];
+
+export const USER_COLORS = [
+  '#0B4F54',
+  '#1E6B5C',
+  '#C45C26',
+  '#2F5D9F',
+  '#7A3E6D',
+  '#3D6B3D',
+  '#B45309',
+  '#0F766E',
+];
