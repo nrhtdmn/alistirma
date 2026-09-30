@@ -1,6 +1,7 @@
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { AppProvider } from './context/AppContext';
+import { AssignmentsPage } from './pages/AssignmentsPage';
 import { CardsPage } from './pages/CardsPage';
 import { EditorPage } from './pages/EditorPage';
 import { FoldersPage } from './pages/FoldersPage';
@@ -17,6 +18,7 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<HomePage />} />
+            <Route path="atamalar" element={<AssignmentsPage />} />
             <Route path="klasorler" element={<FoldersPage />} />
             <Route path="klasorler/:folderId" element={<FoldersPage />} />
             <Route path="duzenle/:id" element={<EditorPage />} />

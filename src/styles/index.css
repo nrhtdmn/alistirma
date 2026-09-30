@@ -1234,3 +1234,12 @@ p {
   background: #fff;
 }
 
+
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0.25rem;
+}

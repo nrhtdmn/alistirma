@@ -13,6 +13,7 @@ import type {
 import { DEFAULT_DECK_OPTIONS, ITEM_TYPE_LABELS, SUBJECT_LABELS } from '../types';
 import { formatDate, formatPercent } from '../utils/format';
 import { uid } from '../utils/id';
+import { canManageContent } from '../utils/roles';
 import {
   createNewReviewState,
   formatInterval,
@@ -450,7 +451,11 @@ export function CardsPage() {
     return (
       <div className="page">
         <p>Bu sette kart yok.</p>
-        <Link to={`/duzenle/${item.id}`}>Düzenle</Link>
+        {canManageContent(currentUser) ? (
+          <Link to={`/duzenle/${item.id}`}>Düzenle</Link>
+        ) : (
+          <Link to="/">Ana sayfa</Link>
+        )}
       </div>
     );
   }
@@ -681,9 +686,11 @@ export function CardsPage() {
           </p>
         </div>
         <div className="hero-actions">
+          {canManageContent(currentUser) && (
           <Link className="btn btn--ghost" to={`/duzenle/${item.id}`}>
             Düzenle
           </Link>
+        )}
           <button
             type="button"
             className="btn btn--ghost"

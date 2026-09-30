@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { MathInput } from '../components/MathField';
 import { useApp } from '../context/AppContext';
 import {
+  CARD_KIND_LABELS,
   DEFAULT_DECK_OPTIONS,
   DEFAULT_SETTINGS,
   GRADE_LEVELS,
@@ -10,6 +11,7 @@ import {
   QUESTION_TYPE_LABELS,
   SUBJECT_LABELS,
   type CardDeckOptions,
+  type CardKind,
   type ChoiceOption,
   type ContentItem,
   type FlashCard,
@@ -21,8 +23,9 @@ import {
   type SubjectKey,
 } from '../types';
 import { uid } from '../utils/id';
+import { canManageContent } from '../utils/roles';
 
-function emptyCard(): FlashCard {
+function emptyCard(kind: CardKind = 'kelime'): FlashCard {
   return {
     id: uid(),
     front: '',
@@ -31,6 +34,7 @@ function emptyCard(): FlashCard {
     hint: '',
     tags: [],
     note: '',
+    kind,
   };
 }
 
@@ -108,26 +112,29 @@ export function EditorPage() {
   const navigate = useNavigate();
   const { items, folders, currentUser, saveItem } = useApp();
   const isNew = id === 'yeni';
+  const allowed = canManageContent(currentUser);
 
   const existing = useMemo(
     () => (isNew ? null : items.find((i) => i.id === id) ?? null),
     [items, id, isNew],
   );
 
+  const initialKind = (params.get('cardKind') as CardKind) || 'kelime';
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<ItemType>(
     (params.get('type') as ItemType) || 'alistirma',
   );
   const [subject, setSubject] = useState<SubjectKey>(
-    params.get('type') === 'kartlar' ? 'ingilizce' : 'matematik',
+    params.get('type') === 'kartlar' ? 'turkce' : 'matematik',
   );
   const [gradeLevel, setGradeLevel] = useState('Genel / Her seviye');
   const [folderId, setFolderId] = useState<string | null>(
     params.get('folder'),
   );
   const [questions, setQuestions] = useState<Question[]>([emptyQuestion()]);
-  const [cards, setCards] = useState<FlashCard[]>([emptyCard()]);
+  const [cardKind, setCardKind] = useState<CardKind>(initialKind);
+  const [cards, setCards] = useState<FlashCard[]>([emptyCard(initialKind)]);
   const [deckOptions, setDeckOptions] = useState<CardDeckOptions>({
     ...DEFAULT_DECK_OPTIONS,
   });
@@ -153,12 +160,28 @@ export function EditorPage() {
     setCards(
       existing.cards && existing.cards.length
         ? existing.cards
-        : [emptyCard()],
+        : [emptyCard(existing.cardKind ?? 'kelime')],
     );
     setDeckOptions({ ...DEFAULT_DECK_OPTIONS, ...existing.deckOptions });
+    setCardKind(existing.cardKind ?? 'kelime');
     setSettings(existing.settings);
     setLoaded(true);
   }, [existing, isNew]);
+
+  if (!allowed) {
+    return (
+      <div className="page">
+        <h1>Yetki yok</h1>
+        <p className="muted">
+          Öğrenci ve veli içerik ekleyemez / düzenleyemez. Öğretmen hesabına
+          geçin.
+        </p>
+        <Link className="btn btn--primary" to="/">
+          Ana sayfa
+        </Link>
+      </div>
+    );
+  }
 
   function updateQuestion(qid: string, patch: Partial<Question>) {
     setQuestions((qs) =>
@@ -209,6 +232,7 @@ export function EditorPage() {
       gradeLevel,
       questions: type === 'kartlar' ? [] : questions,
       cards: type === 'kartlar' ? cards : undefined,
+      cardKind: type === 'kartlar' ? cardKind : undefined,
       deckOptions: type === 'kartlar' ? deckOptions : undefined,
       settings,
       createdAt: existing?.createdAt ?? Date.now(),
@@ -338,6 +362,27 @@ export function EditorPage() {
         <h2>{type === 'kartlar' ? 'Anki / SRS ayarları' : 'Ayarlar'}</h2>
         {type === 'kartlar' ? (
           <div className="form-grid">
+            <label className="field">
+              <span>Kart türü</span>
+              <select
+                className="input"
+                value={cardKind}
+                onChange={(e) => {
+                  const k = e.target.value as CardKind;
+                  setCardKind(k);
+                  setCards((cs) => cs.map((c) => ({ ...c, kind: k })));
+                  if (k === 'es_anlamli' || k === 'zit_anlamli' || k === 'atasozu' || k === 'deyim') {
+                    setSubject('turkce');
+                  }
+                }}
+              >
+                {Object.entries(CARD_KIND_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="field field--wide">
               <span>
                 <input
@@ -350,7 +395,7 @@ export function EditorPage() {
                     })
                   }
                 />{' '}
-                Ters kartlar (anlam → kelime)
+                Ters kartlar
               </span>
             </label>
             <label className="field">
@@ -564,7 +609,9 @@ export function EditorPage() {
         {type === 'kartlar' ? (
           <>
             <div className="section__head">
-              <h2>Kelime kartları ({cards.length})</h2>
+              <h2>
+                {CARD_KIND_LABELS[cardKind]} kartları ({cards.length})
+              </h2>
               <div className="hero-actions">
                 <label className="btn btn--ghost btn--small">
                   CSV içe aktar
@@ -600,6 +647,7 @@ export function EditorPage() {
                           tags: parts[4]
                             ? parts[4].split('|').map((t) => t.trim())
                             : [],
+                          kind: cardKind,
                         });
                       }
                       if (parsed.length) {
@@ -616,7 +664,7 @@ export function EditorPage() {
                 <button
                   type="button"
                   className="btn btn--primary"
-                  onClick={() => setCards((c) => [...c, emptyCard()])}
+                  onClick={() => setCards((c) => [...c, emptyCard(cardKind)])}
                 >
                   + Kart ekle
                 </button>
@@ -663,7 +711,17 @@ export function EditorPage() {
                   </header>
                   <div className="form-grid">
                     <label className="field">
-                      <span>Ön yüz (kelime / ifade)</span>
+                      <span>
+                        {cardKind === 'es_anlamli'
+                          ? 'Kelime'
+                          : cardKind === 'zit_anlamli'
+                            ? 'Kelime'
+                            : cardKind === 'atasozu'
+                              ? 'Atasözü'
+                              : cardKind === 'deyim'
+                                ? 'Deyim'
+                                : 'Ön yüz (kelime / ifade)'}
+                      </span>
                       <input
                         className="input"
                         value={card.front}
@@ -676,11 +734,29 @@ export function EditorPage() {
                             ),
                           )
                         }
-                        placeholder="apple"
+                        placeholder={
+                          cardKind === 'atasozu'
+                            ? 'Damlaya damlaya göl olur'
+                            : cardKind === 'deyim'
+                              ? 'Gözden düşmek'
+                              : cardKind === 'es_anlamli'
+                                ? 'güzel'
+                                : cardKind === 'zit_anlamli'
+                                  ? 'sıcak'
+                                  : 'apple'
+                        }
                       />
                     </label>
                     <label className="field">
-                      <span>Arka yüz (anlam)</span>
+                      <span>
+                        {cardKind === 'es_anlamli'
+                          ? 'Eş anlamı'
+                          : cardKind === 'zit_anlamli'
+                            ? 'Zıt anlamı'
+                            : cardKind === 'atasozu' || cardKind === 'deyim'
+                              ? 'Anlamı / açıklama'
+                              : 'Arka yüz (anlam)'}
+                      </span>
                       <input
                         className="input"
                         value={card.back}
@@ -693,7 +769,17 @@ export function EditorPage() {
                             ),
                           )
                         }
-                        placeholder="elma"
+                        placeholder={
+                          cardKind === 'es_anlamli'
+                            ? 'hoş, latif'
+                            : cardKind === 'zit_anlamli'
+                              ? 'soğuk'
+                              : cardKind === 'atasozu'
+                                ? 'Küçük birikimler büyük sonuç doğurur'
+                                : cardKind === 'deyim'
+                                  ? 'Değerini / itibarını yitirmek'
+                                  : 'elma'
+                        }
                       />
                     </label>
                     <label className="field">

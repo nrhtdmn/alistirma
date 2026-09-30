@@ -10,9 +10,9 @@ import {
 import { liveQuery } from 'dexie';
 import { db } from '../db/database';
 import { ensureSeeded } from '../db/seed';
-import type { Attempt, ContentItem, Folder, User } from '../types';
-import { uid } from '../utils/id';
+import type { Assignment, Attempt, ContentItem, Folder, User } from '../types';
 import { USER_COLORS } from '../types';
+import { uid } from '../utils/id';
 
 interface AppState {
   ready: boolean;
@@ -20,6 +20,7 @@ interface AppState {
   folders: Folder[];
   items: ContentItem[];
   attempts: Attempt[];
+  assignments: Assignment[];
   currentUser: User | null;
   setCurrentUserId: (id: string) => Promise<void>;
   addUser: (data: Omit<User, 'id' | 'createdAt'>) => Promise<string>;
@@ -36,6 +37,8 @@ interface AppState {
   deleteItem: (id: string) => Promise<void>;
   saveAttempt: (attempt: Attempt) => Promise<void>;
   deleteAttempt: (id: string) => Promise<void>;
+  saveAssignment: (a: Assignment) => Promise<void>;
+  deleteAssignment: (id: string) => Promise<void>;
   refresh: () => void;
 }
 
@@ -47,6 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [items, setItems] = useState<ContentItem[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [currentUserId, setCurrentUserIdState] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
 
@@ -64,20 +68,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     const sub = liveQuery(async () => {
-      const [u, f, i, a, m] = await Promise.all([
+      const [u, f, i, a, asg, m] = await Promise.all([
         db.users.toArray(),
         db.folders.toArray(),
         db.items.toArray(),
         db.attempts.toArray(),
+        db.assignments.toArray(),
         db.meta.get('app'),
       ]);
-      return { u, f, i, a, currentUserId: m?.currentUserId ?? null };
+      return {
+        u,
+        f,
+        i,
+        a,
+        asg,
+        currentUserId: m?.currentUserId ?? null,
+      };
     }).subscribe({
       next: (data) => {
-        setUsers(data.u.sort((a, b) => a.name.localeCompare(b.name, 'tr')));
+        setUsers(data.u.sort((x, y) => x.name.localeCompare(y.name, 'tr')));
         setFolders(data.f);
-        setItems(data.i.sort((a, b) => b.updatedAt - a.updatedAt));
-        setAttempts(data.a.sort((a, b) => b.completedAt - a.completedAt));
+        setItems(data.i.sort((x, y) => y.updatedAt - x.updatedAt));
+        setAttempts(data.a.sort((x, y) => y.completedAt - x.completedAt));
+        setAssignments(data.asg.sort((x, y) => y.createdAt - x.createdAt));
         setCurrentUserIdState(data.currentUserId);
       },
       error: console.error,
@@ -193,12 +206,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await db.attempts.delete(id);
   }, []);
 
+  const saveAssignment = useCallback(async (a: Assignment) => {
+    await db.assignments.put(a);
+  }, []);
+
+  const deleteAssignment = useCallback(async (id: string) => {
+    await db.assignments.delete(id);
+  }, []);
+
   const value: AppState = {
     ready,
     users,
     folders,
     items,
     attempts,
+    assignments,
     currentUser,
     setCurrentUserId,
     addUser,
@@ -211,6 +233,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteItem,
     saveAttempt,
     deleteAttempt,
+    saveAssignment,
+    deleteAssignment,
     refresh: () => setTick((t) => t + 1),
   };
 

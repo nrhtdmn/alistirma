@@ -2,14 +2,19 @@ import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import {
+  CARD_KIND_LABELS,
   ITEM_TYPE_LABELS,
   SUBJECT_LABELS,
   type ContentItem,
 } from '../types';
 import { formatDate, formatPercent } from '../utils/format';
+import { canManageContent, isStudent } from '../utils/roles';
 
 export function HomePage() {
-  const { currentUser, items, folders, attempts, users } = useApp();
+  const { currentUser, items, folders, attempts, users, assignments } =
+    useApp();
+  const canEdit = canManageContent(currentUser);
+  const student = isStudent(currentUser);
 
   const myAttempts = useMemo(
     () =>
@@ -18,6 +23,13 @@ export function HomePage() {
         : [],
     [attempts, currentUser],
   );
+
+  const myAssignments = useMemo(() => {
+    if (!currentUser) return [];
+    return assignments
+      .filter((a) => a.studentIds.includes(currentUser.id))
+      .slice(0, 5);
+  }, [assignments, currentUser]);
 
   const recent = items.slice(0, 6);
 
@@ -35,41 +47,59 @@ export function HomePage() {
       attempts: att.length,
       avg,
       users: users.length,
+      assigned: myAssignments.length,
     };
-  }, [folders, items, attempts, users, currentUser]);
+  }, [folders, items, attempts, users, currentUser, myAssignments]);
 
   return (
     <div className="page">
       <header className="page-hero">
         <div>
-          <p className="eyebrow">Hoş geldin{currentUser ? `, ${currentUser.name}` : ''}</p>
+          <p className="eyebrow">
+            Hoş geldin{currentUser ? `, ${currentUser.name}` : ''}
+          </p>
           <h1>Alıştırma</h1>
           <p className="lede">
-            1. sınıftan doktoraya — her ders için alıştırma, test ve sınav oluştur,
-            çöz, sonuçları sakla ve paylaş. Her şey cihazında kalır.
+            {student
+              ? 'Atanan sınavlarını çöz, kart çalış, sonuçlarını paylaş.'
+              : 'Alıştırma, test, sınav ve kart oluştur; öğrencilere ata; sonuçları izle.'}
           </p>
         </div>
         <div className="hero-actions">
-          <Link className="btn btn--primary" to="/duzenle/yeni">
-            Yeni içerik
-          </Link>
-          <Link className="btn btn--ghost" to="/duzenle/yeni?type=kartlar">
-            Kelime kartları
-          </Link>
+          {canEdit ? (
+            <>
+              <Link className="btn btn--primary" to="/duzenle/yeni">
+                Yeni içerik
+              </Link>
+              <Link
+                className="btn btn--ghost"
+                to="/duzenle/yeni?type=kartlar"
+              >
+                Kartlar
+              </Link>
+              <Link className="btn btn--ghost" to="/atamalar">
+                Atama yap
+              </Link>
+            </>
+          ) : (
+            <Link className="btn btn--primary" to="/atamalar">
+              Atananlarım
+            </Link>
+          )}
           <Link className="btn btn--ghost" to="/klasorler">
-            Klasörlere git
+            Klasörler
           </Link>
         </div>
       </header>
 
       <section className="stat-grid">
         <div className="stat">
-          <span className="stat__n">{stats.items}</span>
-          <span className="stat__l">İçerik</span>
+          <span className="stat__n">{stats.assigned}</span>
+          <span className="stat__l">Atama</span>
         </div>
         <div className="stat">
-          <span className="stat__n">{stats.folders}</span>
-          <span className="stat__l">Klasör</span>
+          <span className="stat__n">{stats.items}</span>
+          <span className="stat__l">İçerik</span>
         </div>
         <div className="stat">
           <span className="stat__n">{stats.attempts}</span>
@@ -81,6 +111,27 @@ export function HomePage() {
         </div>
       </section>
 
+      {student && myAssignments.length > 0 && (
+        <section className="section">
+          <div className="section__head">
+            <h2>Sana atananlar</h2>
+            <Link to="/atamalar">Tümü</Link>
+          </div>
+          <div className="item-grid">
+            {myAssignments.map((a) => (
+              <article key={a.id} className="item-card">
+                <span className="tag">Atama</span>
+                <h3>{a.title}</h3>
+                <p className="muted tiny">{a.itemIds.length} içerik</p>
+                <Link className="btn btn--small btn--primary" to="/atamalar">
+                  Görüntüle
+                </Link>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="section">
         <div className="section__head">
           <h2>Son içerikler</h2>
@@ -88,10 +139,10 @@ export function HomePage() {
         </div>
         <div className="item-grid">
           {recent.map((item) => (
-            <ItemCard key={item.id} item={item} />
+            <ItemCard key={item.id} item={item} canEdit={canEdit} />
           ))}
           {recent.length === 0 && (
-            <p className="muted">Henüz içerik yok. İlk alıştırmanı oluştur.</p>
+            <p className="muted">Henüz içerik yok.</p>
           )}
         </div>
       </section>
@@ -138,7 +189,13 @@ export function HomePage() {
   );
 }
 
-function ItemCard({ item }: { item: ContentItem }) {
+function ItemCard({
+  item,
+  canEdit,
+}: {
+  item: ContentItem;
+  canEdit: boolean;
+}) {
   const isCards = item.type === 'kartlar';
   const count = isCards ? (item.cards?.length ?? 0) : item.questions.length;
   return (
@@ -146,6 +203,11 @@ function ItemCard({ item }: { item: ContentItem }) {
       <div className="item-card__meta">
         <span className="tag">{ITEM_TYPE_LABELS[item.type]}</span>
         <span className="tag tag--soft">{SUBJECT_LABELS[item.subject]}</span>
+        {isCards && item.cardKind && (
+          <span className="tag tag--soft">
+            {CARD_KIND_LABELS[item.cardKind]}
+          </span>
+        )}
       </div>
       <h3>{item.title}</h3>
       <p className="muted tiny">
@@ -158,9 +220,14 @@ function ItemCard({ item }: { item: ContentItem }) {
         >
           {isCards ? 'Çalış' : 'Çöz'}
         </Link>
-        <Link className="btn btn--small btn--ghost" to={`/duzenle/${item.id}`}>
-          Düzenle
-        </Link>
+        {canEdit && (
+          <Link
+            className="btn btn--small btn--ghost"
+            to={`/duzenle/${item.id}`}
+          >
+            Düzenle
+          </Link>
+        )}
       </div>
     </article>
   );

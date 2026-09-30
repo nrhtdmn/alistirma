@@ -1,14 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { exportAll, importBundle, type ImportMode } from '../db/exportImport';
 import { db } from '../db/database';
+import { canManageSystem } from '../utils/roles';
 
 export function SettingsPage() {
-  const { refresh, users, folders, items, attempts } = useApp();
+  const { refresh, users, folders, items, attempts, currentUser } = useApp();
   const fileRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<ImportMode>('merge');
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  if (!canManageSystem(currentUser)) {
+    return (
+      <div className="page">
+        <h1>Yetki yok</h1>
+        <p className="muted">Ayarlar yalnızca öğretmene açıktır.</p>
+        <Link className="btn btn--primary" to="/">
+          Ana sayfa
+        </Link>
+      </div>
+    );
+  }
 
   async function handleImport(file: File) {
     setBusy(true);
@@ -43,6 +57,7 @@ export function SettingsPage() {
         db.attempts.clear(),
         db.cardReviews.clear(),
         db.reviewLogs.clear(),
+        db.assignments.clear(),
         db.meta.clear(),
       ]);
     });

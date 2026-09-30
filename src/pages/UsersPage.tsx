@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Modal } from '../components/Modal';
 import { useApp } from '../context/AppContext';
 import {
@@ -8,6 +9,7 @@ import {
   type UserRole,
 } from '../types';
 import { formatDate } from '../utils/format';
+import { canManageSystem } from '../utils/roles';
 
 export function UsersPage() {
   const {
@@ -24,6 +26,18 @@ export function UsersPage() {
   const [name, setName] = useState('');
   const [role, setRole] = useState<UserRole>('ogrenci');
   const [color, setColor] = useState(USER_COLORS[0]);
+
+  if (!canManageSystem(currentUser)) {
+    return (
+      <div className="page">
+        <h1>Yetki yok</h1>
+        <p className="muted">Kullanıcı yönetimi yalnızca öğretmene açıktır.</p>
+        <Link className="btn btn--primary" to="/">
+          Ana sayfa
+        </Link>
+      </div>
+    );
+  }
 
   function openCreate() {
     setEdit(null);

@@ -5,11 +5,13 @@ import { Modal } from '../components/Modal';
 import { useApp } from '../context/AppContext';
 import { exportFolderTree, exportItems } from '../db/exportImport';
 import {
+  CARD_KIND_LABELS,
   ITEM_TYPE_LABELS,
   SUBJECT_LABELS,
   USER_COLORS,
   type ContentItem,
 } from '../types';
+import { canManageContent } from '../utils/roles';
 
 export function FoldersPage() {
   const { folderId } = useParams();
@@ -17,11 +19,13 @@ export function FoldersPage() {
   const {
     folders,
     items,
+    currentUser,
     addFolder,
     updateFolder,
     deleteFolder,
     deleteItem,
   } = useApp();
+  const canEdit = canManageContent(currentUser);
 
   const activeId = folderId ?? null;
   const [newName, setNewName] = useState('');
@@ -109,24 +113,28 @@ export function FoldersPage() {
       <aside className="folders-side">
         <div className="section__head">
           <h2>Klasörler</h2>
-          <button
-            type="button"
-            className="btn btn--small btn--primary"
-            onClick={() => openCreate(activeId)}
-            title={
-              activeId
-                ? 'Seçili klasörün altına alt klasör ekle'
-                : 'Kök klasör ekle'
-            }
-          >
-            + Klasör
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              className="btn btn--small btn--primary"
+              onClick={() => openCreate(activeId)}
+              title={
+                activeId
+                  ? 'Seçili klasörün altına alt klasör ekle'
+                  : 'Kök klasör ekle'
+              }
+            >
+              + Klasör
+            </button>
+          )}
         </div>
-        <p className="tiny muted pad">
-          {activeFolder
-            ? `Yeni klasör “${activeFolder.name}” altına eklenir.`
-            : 'Yeni klasör köke eklenir. Alt klasör için önce bir klasöre girin.'}
-        </p>
+        {canEdit && (
+          <p className="tiny muted pad">
+            {activeFolder
+              ? `Yeni klasör “${activeFolder.name}” altına eklenir.`
+              : 'Yeni klasör köke eklenir. Alt klasör için önce bir klasöre girin.'}
+          </p>
+        )}
         <FolderTree
           activeId={activeId}
           onSelect={(id) =>
@@ -145,26 +153,54 @@ export function FoldersPage() {
             </p>
           </div>
           <div className="hero-actions">
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => openCreate(activeId)}
-            >
-              {activeFolder ? '+ Alt klasör' : '+ Klasör'}
-            </button>
-            <Link
-              className="btn btn--ghost"
-              to={`/duzenle/yeni${activeId ? `?folder=${activeId}` : ''}`}
-            >
-              Yeni içerik
-            </Link>
-            <Link
-              className="btn btn--ghost"
-              to={`/duzenle/yeni?type=kartlar${activeId ? `&folder=${activeId}` : ''}`}
-            >
-              Kelime kartları
-            </Link>
-            {activeFolder && (
+            {canEdit && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => openCreate(activeId)}
+                >
+                  {activeFolder ? '+ Alt klasör' : '+ Klasör'}
+                </button>
+                <Link
+                  className="btn btn--ghost"
+                  to={`/duzenle/yeni${activeId ? `?folder=${activeId}` : ''}`}
+                >
+                  Yeni içerik
+                </Link>
+                <Link
+                  className="btn btn--ghost"
+                  to={`/duzenle/yeni?type=kartlar${activeId ? `&folder=${activeId}` : ''}`}
+                >
+                  Kartlar
+                </Link>
+                <Link
+                  className="btn btn--ghost"
+                  to={`/duzenle/yeni?type=kartlar&cardKind=es_anlamli${activeId ? `&folder=${activeId}` : ''}`}
+                >
+                  Eş anlamlı
+                </Link>
+                <Link
+                  className="btn btn--ghost"
+                  to={`/duzenle/yeni?type=kartlar&cardKind=zit_anlamli${activeId ? `&folder=${activeId}` : ''}`}
+                >
+                  Zıt anlamlı
+                </Link>
+                <Link
+                  className="btn btn--ghost"
+                  to={`/duzenle/yeni?type=kartlar&cardKind=atasozu${activeId ? `&folder=${activeId}` : ''}`}
+                >
+                  Atasözü
+                </Link>
+                <Link
+                  className="btn btn--ghost"
+                  to={`/duzenle/yeni?type=kartlar&cardKind=deyim${activeId ? `&folder=${activeId}` : ''}`}
+                >
+                  Deyim
+                </Link>
+              </>
+            )}
+            {canEdit && activeFolder && (
               <>
                 <button
                   type="button"
@@ -209,14 +245,16 @@ export function FoldersPage() {
                     <span className="dot lg" style={{ background: f.color }} />
                     <strong>{f.name}</strong>
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn--small btn--ghost folder-tile-add"
-                    title="Alt klasör ekle"
-                    onClick={() => openCreate(f.id)}
-                  >
-                    + Alt
-                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="btn btn--small btn--ghost folder-tile-add"
+                      title="Alt klasör ekle"
+                      onClick={() => openCreate(f.id)}
+                    >
+                      + Alt
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -241,6 +279,7 @@ export function FoldersPage() {
               <ItemRow
                 key={item.id}
                 item={item}
+                canEdit={canEdit}
                 onDelete={async () => {
                   if (!confirm(`"${item.title}" silinsin mi?`)) return;
                   await deleteItem(item.id);
@@ -330,9 +369,11 @@ export function FoldersPage() {
 
 function ItemRow({
   item,
+  canEdit,
   onDelete,
 }: {
   item: ContentItem;
+  canEdit: boolean;
   onDelete: () => void;
 }) {
   const isCards = item.type === 'kartlar';
@@ -346,6 +387,11 @@ function ItemRow({
       <div className="item-card__meta">
         <span className="tag">{ITEM_TYPE_LABELS[item.type]}</span>
         <span className="tag tag--soft">{SUBJECT_LABELS[item.subject]}</span>
+        {isCards && item.cardKind && (
+          <span className="tag tag--soft">
+            {CARD_KIND_LABELS[item.cardKind]}
+          </span>
+        )}
       </div>
       <h3>{item.title}</h3>
       <p className="muted tiny">
@@ -355,23 +401,30 @@ function ItemRow({
         <Link className="btn btn--small btn--primary" to={solveTo}>
           {isCards ? 'Çalış' : 'Çöz'}
         </Link>
-        <Link className="btn btn--small btn--ghost" to={`/duzenle/${item.id}`}>
-          Düzenle
-        </Link>
-        <button
-          type="button"
-          className="btn btn--small btn--ghost"
-          onClick={() => exportItems([item.id])}
-        >
-          Aktar
-        </button>
-        <button
-          type="button"
-          className="btn btn--small btn--danger"
-          onClick={onDelete}
-        >
-          Sil
-        </button>
+        {canEdit && (
+          <>
+            <Link
+              className="btn btn--small btn--ghost"
+              to={`/duzenle/${item.id}`}
+            >
+              Düzenle
+            </Link>
+            <button
+              type="button"
+              className="btn btn--small btn--ghost"
+              onClick={() => exportItems([item.id])}
+            >
+              Aktar
+            </button>
+            <button
+              type="button"
+              className="btn btn--small btn--danger"
+              onClick={onDelete}
+            >
+              Sil
+            </button>
+          </>
+        )}
       </div>
     </article>
   );

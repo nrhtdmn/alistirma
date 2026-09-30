@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS } from '../types';
 import type { ExamShareBundle } from '../utils/shareExam';
 
 export async function exportAll(): Promise<void> {
-  const [users, folders, items, attempts, cardReviews, reviewLogs] =
+  const [users, folders, items, attempts, cardReviews, reviewLogs, assignments] =
     await Promise.all([
       db.users.toArray(),
       db.folders.toArray(),
@@ -13,6 +13,7 @@ export async function exportAll(): Promise<void> {
       db.attempts.toArray(),
       db.cardReviews.toArray(),
       db.reviewLogs.toArray(),
+      db.assignments.toArray(),
     ]);
   const bundle: ExportBundle = {
     version: 1,
@@ -24,6 +25,7 @@ export async function exportAll(): Promise<void> {
     attempts,
     cardReviews,
     reviewLogs,
+    assignments,
   };
   downloadJson(bundle, `alistirma-yedek-${dateStamp()}.json`);
 }
@@ -112,6 +114,7 @@ export async function importBundle(
           db.attempts.clear(),
           db.cardReviews.clear(),
           db.reviewLogs.clear(),
+          db.assignments.clear(),
         ]);
       });
     }
@@ -159,6 +162,7 @@ export async function importBundle(
         db.attempts.clear(),
         db.cardReviews.clear(),
         db.reviewLogs.clear(),
+        db.assignments.clear(),
       ]);
     });
   }
@@ -169,6 +173,7 @@ export async function importBundle(
   const attempts = data.attempts ?? [];
   const cardReviews = data.cardReviews ?? [];
   const reviewLogs = data.reviewLogs ?? [];
+  const assignments = data.assignments ?? [];
 
   await db.transaction('rw', db.tables, async () => {
     if (users.length) await db.users.bulkPut(users);
@@ -177,6 +182,7 @@ export async function importBundle(
     if (attempts.length) await db.attempts.bulkPut(attempts);
     if (cardReviews.length) await db.cardReviews.bulkPut(cardReviews);
     if (reviewLogs.length) await db.reviewLogs.bulkPut(reviewLogs);
+    if (assignments.length) await db.assignments.bulkPut(assignments);
   });
 
   await db.meta.put({

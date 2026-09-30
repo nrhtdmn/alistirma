@@ -224,6 +224,126 @@ export async function ensureSeeded(): Promise<void> {
     ],
   };
 
+  const sampleEs: ContentItem = {
+    id: uid(),
+    folderId: rootTurkce.id,
+    ownerId: teacherId,
+    type: 'kartlar',
+    title: 'Eş Anlamlılar',
+    description: 'Türkçe eş anlamlı kelimeler',
+    subject: 'turkce',
+    gradeLevel: '4. Sınıf',
+    cardKind: 'es_anlamli',
+    settings: { ...DEFAULT_SETTINGS },
+    deckOptions: { ...DEFAULT_DECK_OPTIONS, enableReverse: true },
+    createdAt: now,
+    updatedAt: now,
+    questions: [],
+    cards: [
+      { id: uid(), kind: 'es_anlamli', front: 'güzel', back: 'hoş, latif' },
+      { id: uid(), kind: 'es_anlamli', front: 'hızlı', back: 'çabuk, süratli' },
+      { id: uid(), kind: 'es_anlamli', front: 'akıllı', back: 'zeki, uslu' },
+      { id: uid(), kind: 'es_anlamli', front: 'mutlu', back: 'sevinçli, mesut' },
+    ],
+  };
+
+  const sampleZit: ContentItem = {
+    id: uid(),
+    folderId: rootTurkce.id,
+    ownerId: teacherId,
+    type: 'kartlar',
+    title: 'Zıt Anlamlılar',
+    description: 'Türkçe zıt anlamlı kelimeler',
+    subject: 'turkce',
+    gradeLevel: '4. Sınıf',
+    cardKind: 'zit_anlamli',
+    settings: { ...DEFAULT_SETTINGS },
+    deckOptions: { ...DEFAULT_DECK_OPTIONS, enableReverse: true },
+    createdAt: now,
+    updatedAt: now,
+    questions: [],
+    cards: [
+      { id: uid(), kind: 'zit_anlamli', front: 'sıcak', back: 'soğuk' },
+      { id: uid(), kind: 'zit_anlamli', front: 'uzun', back: 'kısa' },
+      { id: uid(), kind: 'zit_anlamli', front: 'açık', back: 'kapalı' },
+      { id: uid(), kind: 'zit_anlamli', front: 'iyi', back: 'kötü' },
+    ],
+  };
+
+  const sampleAtasozu: ContentItem = {
+    id: uid(),
+    folderId: rootTurkce.id,
+    ownerId: teacherId,
+    type: 'kartlar',
+    title: 'Atasözleri',
+    description: 'Atasözü ve anlamı',
+    subject: 'turkce',
+    gradeLevel: '5. Sınıf',
+    cardKind: 'atasozu',
+    settings: { ...DEFAULT_SETTINGS },
+    deckOptions: { ...DEFAULT_DECK_OPTIONS, enableReverse: false },
+    createdAt: now,
+    updatedAt: now,
+    questions: [],
+    cards: [
+      {
+        id: uid(),
+        kind: 'atasozu',
+        front: 'Damlaya damlaya göl olur',
+        back: 'Küçük birikimler büyük sonuç doğurur',
+      },
+      {
+        id: uid(),
+        kind: 'atasozu',
+        front: 'Ayağını yorganına göre uzat',
+        back: 'İmkânına göre harca / yaşa',
+      },
+      {
+        id: uid(),
+        kind: 'atasozu',
+        front: 'Komşu komşunun külüne muhtaçtır',
+        back: 'İnsanlar birbirine ihtiyaç duyar',
+      },
+    ],
+  };
+
+  const sampleDeyim: ContentItem = {
+    id: uid(),
+    folderId: rootTurkce.id,
+    ownerId: teacherId,
+    type: 'kartlar',
+    title: 'Deyimler',
+    description: 'Deyim ve anlamı',
+    subject: 'turkce',
+    gradeLevel: '5. Sınıf',
+    cardKind: 'deyim',
+    settings: { ...DEFAULT_SETTINGS },
+    deckOptions: { ...DEFAULT_DECK_OPTIONS, enableReverse: false },
+    createdAt: now,
+    updatedAt: now,
+    questions: [],
+    cards: [
+      {
+        id: uid(),
+        kind: 'deyim',
+        front: 'Gözden düşmek',
+        back: 'İtibarını / değerini yitirmek',
+      },
+      {
+        id: uid(),
+        kind: 'deyim',
+        front: 'Kulak kabartmak',
+        back: 'Dikkatle dinlemek',
+      },
+      {
+        id: uid(),
+        kind: 'deyim',
+        front: 'Etekleri zil çalmak',
+        back: 'Çok sevinmek',
+      },
+    ],
+  };
+
   await db.transaction(
     'rw',
     db.users,
@@ -239,7 +359,15 @@ export async function ensureSeeded(): Promise<void> {
         rootIngilizce,
         subSinif1,
       ]);
-      await db.items.bulkAdd([sample, sampleTurkce, sampleCards]);
+      await db.items.bulkAdd([
+        sample,
+        sampleTurkce,
+        sampleCards,
+        sampleEs,
+        sampleZit,
+        sampleAtasozu,
+        sampleDeyim,
+      ]);
       await db.meta.put({
         id: 'app',
         currentUserId: teacherId,

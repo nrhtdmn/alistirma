@@ -121,9 +121,9 @@ export interface ItemSettings {
 
 export interface FlashCard {
   id: string;
-  /** Ön yüz — kelime / soru */
+  /** Ön yüz — kelime / soru / deyim */
   front: string;
-  /** Arka yüz — anlam / cevap */
+  /** Arka yüz — anlam / eş / zıt / açıklama */
   back: string;
   /** Örnek cümle (isteğe bağlı) */
   example?: string;
@@ -133,6 +133,37 @@ export interface FlashCard {
   tags?: string[];
   /** Ek not */
   note?: string;
+  /** Kart türü */
+  kind?: CardKind;
+}
+
+export type CardKind =
+  | 'kelime'
+  | 'es_anlamli'
+  | 'zit_anlamli'
+  | 'atasozu'
+  | 'deyim';
+
+export const CARD_KIND_LABELS: Record<CardKind, string> = {
+  kelime: 'Kelime',
+  es_anlamli: 'Eş anlamlı',
+  zit_anlamli: 'Zıt anlamlı',
+  atasozu: 'Atasözü',
+  deyim: 'Deyim',
+};
+
+/** Öğretmenin öğrenciye verdiği sınav / içerik ataması */
+export interface Assignment {
+  id: string;
+  title: string;
+  note: string;
+  /** Bir veya birden fazla içerik (sınav, test, alıştırma, kart…) */
+  itemIds: string[];
+  /** Bir veya birden fazla öğrenci */
+  studentIds: string[];
+  assignedBy: string;
+  dueAt: number | null;
+  createdAt: number;
 }
 
 /** Anki tarzı deste ayarları */
@@ -232,6 +263,8 @@ export interface ContentItem {
   questions: Question[];
   /** Kelime kartları (type === 'kartlar') */
   cards?: FlashCard[];
+  /** Deste varsayılan kart türü */
+  cardKind?: CardKind;
   deckOptions?: CardDeckOptions;
   settings: ItemSettings;
   createdAt: number;
@@ -276,6 +309,7 @@ export interface ExportBundle {
   attempts?: Attempt[];
   cardReviews?: CardReviewState[];
   reviewLogs?: ReviewLogEntry[];
+  assignments?: Assignment[];
 }
 
 export const DEFAULT_SETTINGS: ItemSettings = {
