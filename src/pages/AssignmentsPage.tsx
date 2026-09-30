@@ -219,7 +219,26 @@ export function AssignmentsPage() {
         })}
       </div>
 
-      <Modal open={open} title="Yeni atama" onClose={() => setOpen(false)} wide>
+      <Modal
+        open={open}
+        title="Yeni atama"
+        onClose={() => setOpen(false)}
+        wide
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setOpen(false)}
+            >
+              İptal
+            </button>
+            <button type="button" className="btn btn--primary" onClick={create}>
+              Ata
+            </button>
+          </>
+        }
+      >
         <label className="field">
           <span>Başlık</span>
           <input
@@ -227,6 +246,7 @@ export function AssignmentsPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Örn. 5. Sınıf Haftalık Sınav"
+            autoFocus
           />
         </label>
         <label className="field">
@@ -249,10 +269,15 @@ export function AssignmentsPage() {
         </label>
 
         <div className="field">
-          <span>İçerikler (bir veya birden fazla)</span>
+          <span>
+            İçerikler{' '}
+            <span className="tiny muted">
+              ({selectedItems.length} seçili)
+            </span>
+          </span>
           <div className="check-list">
             {assignableItems.map((it) => (
-              <label key={it.id} className="choice">
+              <label key={it.id} className="choice choice--compact">
                 <input
                   type="checkbox"
                   checked={selectedItems.includes(it.id)}
@@ -275,10 +300,15 @@ export function AssignmentsPage() {
         </div>
 
         <div className="field">
-          <span>Öğrenciler (bir veya birden fazla)</span>
+          <span>
+            Öğrenciler{' '}
+            <span className="tiny muted">
+              ({selectedStudents.length} seçili)
+            </span>
+          </span>
           <div className="check-list">
             {students.map((s) => (
-              <label key={s.id} className="choice">
+              <label key={s.id} className="choice choice--compact">
                 <input
                   type="checkbox"
                   checked={selectedStudents.includes(s.id)}
@@ -295,19 +325,6 @@ export function AssignmentsPage() {
               </p>
             )}
           </div>
-        </div>
-
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setOpen(false)}
-          >
-            İptal
-          </button>
-          <button type="button" className="btn btn--primary" onClick={create}>
-            Ata
-          </button>
         </div>
       </Modal>
     </div>

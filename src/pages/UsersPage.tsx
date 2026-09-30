@@ -137,6 +137,20 @@ export function UsersPage() {
         open={open}
         title={edit ? 'Kullanıcıyı düzenle' : 'Yeni kullanıcı'}
         onClose={() => setOpen(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setOpen(false)}
+            >
+              İptal
+            </button>
+            <button type="button" className="btn btn--primary" onClick={save}>
+              Kaydet
+            </button>
+          </>
+        }
       >
         <label className="field">
           <span>Ad</span>
@@ -175,18 +189,6 @@ export function UsersPage() {
               />
             ))}
           </div>
-        </div>
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setOpen(false)}
-          >
-            İptal
-          </button>
-          <button type="button" className="btn btn--primary" onClick={save}>
-            Kaydet
-          </button>
         </div>
       </Modal>
     </div>

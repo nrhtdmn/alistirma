@@ -297,6 +297,24 @@ export function FoldersPage() {
         open={createOpen}
         title={createParentId ? 'Alt klasör oluştur' : 'Klasör oluştur'}
         onClose={() => setCreateOpen(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setCreateOpen(false)}
+            >
+              İptal
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => void handleCreateFolder()}
+            >
+              Oluştur
+            </button>
+          </>
+        }
       >
         <p className="muted tiny">
           Konum: <strong>{createParentName}</strong>
@@ -313,28 +331,30 @@ export function FoldersPage() {
           />
         </label>
         {createError && <p className="notice danger-notice">{createError}</p>}
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setCreateOpen(false)}
-          >
-            İptal
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => void handleCreateFolder()}
-          >
-            Oluştur
-          </button>
-        </div>
       </Modal>
 
       <Modal
         open={renameOpen}
         title="Yeniden adlandır"
         onClose={() => setRenameOpen(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => setRenameOpen(false)}
+            >
+              İptal
+            </button>
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => void handleRename()}
+            >
+              Kaydet
+            </button>
+          </>
+        }
       >
         <label className="field">
           <span>Yeni ad</span>
@@ -346,22 +366,6 @@ export function FoldersPage() {
             onKeyDown={(e) => e.key === 'Enter' && void handleRename()}
           />
         </label>
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="btn btn--ghost"
-            onClick={() => setRenameOpen(false)}
-          >
-            İptal
-          </button>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => void handleRename()}
-          >
-            Kaydet
-          </button>
-        </div>
       </Modal>
     </div>
   );
