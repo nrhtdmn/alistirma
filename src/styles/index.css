@@ -918,6 +918,77 @@ p {
   font-weight: 500;
 }
 
+.anki-rates {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.anki-rate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: center;
+  padding: 0.75rem 0.4rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.anki-rate:hover {
+  transform: translateY(-2px);
+}
+
+.anki-rate strong {
+  font-size: 0.9rem;
+}
+
+.anki-rate small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.anki-rate--1 {
+  border-color: #f0b4ae;
+  background: #fff6f5;
+  color: var(--danger);
+}
+
+.anki-rate--2 {
+  border-color: #e2c88a;
+  background: #fff9ee;
+  color: #8a5a10;
+}
+
+.anki-rate--3 {
+  border-color: #8dcfab;
+  background: #f1faf5;
+  color: var(--ok);
+}
+
+.anki-rate--4 {
+  border-color: #7eb6d6;
+  background: #eef7fc;
+  color: #1a5f8a;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .anki-rates {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .danger-notice {
   background: #fdecec;
   color: var(--danger);

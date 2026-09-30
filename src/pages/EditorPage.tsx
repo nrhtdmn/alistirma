@@ -3,11 +3,13 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { MathInput } from '../components/MathField';
 import { useApp } from '../context/AppContext';
 import {
+  DEFAULT_DECK_OPTIONS,
   DEFAULT_SETTINGS,
   GRADE_LEVELS,
   ITEM_TYPE_LABELS,
   QUESTION_TYPE_LABELS,
   SUBJECT_LABELS,
+  type CardDeckOptions,
   type ChoiceOption,
   type ContentItem,
   type FlashCard,
@@ -21,7 +23,15 @@ import {
 import { uid } from '../utils/id';
 
 function emptyCard(): FlashCard {
-  return { id: uid(), front: '', back: '', example: '', hint: '' };
+  return {
+    id: uid(),
+    front: '',
+    back: '',
+    example: '',
+    hint: '',
+    tags: [],
+    note: '',
+  };
 }
 
 function emptyQuestion(type: QuestionType = 'coktan_secmeli'): Question {
@@ -89,6 +99,9 @@ export function EditorPage() {
   );
   const [questions, setQuestions] = useState<Question[]>([emptyQuestion()]);
   const [cards, setCards] = useState<FlashCard[]>([emptyCard()]);
+  const [deckOptions, setDeckOptions] = useState<CardDeckOptions>({
+    ...DEFAULT_DECK_OPTIONS,
+  });
   const [settings, setSettings] = useState<ItemSettings>({ ...DEFAULT_SETTINGS });
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -113,6 +126,7 @@ export function EditorPage() {
         ? existing.cards
         : [emptyCard()],
     );
+    setDeckOptions({ ...DEFAULT_DECK_OPTIONS, ...existing.deckOptions });
     setSettings(existing.settings);
     setLoaded(true);
   }, [existing, isNew]);
@@ -166,6 +180,7 @@ export function EditorPage() {
       gradeLevel,
       questions: type === 'kartlar' ? [] : questions,
       cards: type === 'kartlar' ? cards : undefined,
+      deckOptions: type === 'kartlar' ? deckOptions : undefined,
       settings,
       createdAt: existing?.createdAt ?? Date.now(),
       updatedAt: Date.now(),
@@ -291,85 +306,229 @@ export function EditorPage() {
       </section>
 
       <section className="panel">
-        <h2>Ayarlar</h2>
-        <div className="checks">
-          <label>
-            <input
-              type="checkbox"
-              checked={settings.shuffleQuestions}
-              onChange={(e) =>
-                setSettings({ ...settings, shuffleQuestions: e.target.checked })
-              }
-            />
-            Soruları karıştır
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={settings.shuffleOptions}
-              onChange={(e) =>
-                setSettings({ ...settings, shuffleOptions: e.target.checked })
-              }
-            />
-            Şıkları karıştır
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={settings.showResultsImmediately}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  showResultsImmediately: e.target.checked,
-                })
-              }
-            />
-            Bitince sonucu göster
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={settings.allowReview}
-              onChange={(e) =>
-                setSettings({ ...settings, allowReview: e.target.checked })
-              }
-            />
-            Gözden geçirmeye izin ver
-          </label>
-          <label className="inline-field">
-            Süre (dk, boş=sınırsız)
-            <input
-              className="input input--sm"
-              type="number"
-              min={1}
-              value={settings.timeLimitMinutes ?? ''}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  timeLimitMinutes: e.target.value
-                    ? Number(e.target.value)
-                    : null,
-                })
-              }
-            />
-          </label>
-          <label className="inline-field">
-            Geçme barajı %
-            <input
-              className="input input--sm"
-              type="number"
-              min={0}
-              max={100}
-              value={settings.passScorePercent}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  passScorePercent: Number(e.target.value),
-                })
-              }
-            />
-          </label>
-        </div>
+        <h2>{type === 'kartlar' ? 'Anki / SRS ayarları' : 'Ayarlar'}</h2>
+        {type === 'kartlar' ? (
+          <div className="form-grid">
+            <label className="field field--wide">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={deckOptions.enableReverse}
+                  onChange={(e) =>
+                    setDeckOptions({
+                      ...deckOptions,
+                      enableReverse: e.target.checked,
+                    })
+                  }
+                />{' '}
+                Ters kartlar (anlam → kelime)
+              </span>
+            </label>
+            <label className="field">
+              <span>Günlük yeni kart</span>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                value={deckOptions.newPerDay}
+                onChange={(e) =>
+                  setDeckOptions({
+                    ...deckOptions,
+                    newPerDay: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Günlük tekrar (0=∞)</span>
+              <input
+                className="input"
+                type="number"
+                min={0}
+                value={deckOptions.reviewsPerDay}
+                onChange={(e) =>
+                  setDeckOptions({
+                    ...deckOptions,
+                    reviewsPerDay: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Öğrenme adımları (dk, virgülle)</span>
+              <input
+                className="input"
+                value={deckOptions.learningStepsMinutes.join(', ')}
+                onChange={(e) =>
+                  setDeckOptions({
+                    ...deckOptions,
+                    learningStepsMinutes: e.target.value
+                      .split(',')
+                      .map((x) => Number(x.trim()))
+                      .filter((n) => n > 0),
+                  })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Mezuniyet aralığı (gün)</span>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={deckOptions.graduatingIntervalDays}
+                onChange={(e) =>
+                  setDeckOptions({
+                    ...deckOptions,
+                    graduatingIntervalDays: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Easy aralığı (gün)</span>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={deckOptions.easyIntervalDays}
+                onChange={(e) =>
+                  setDeckOptions({
+                    ...deckOptions,
+                    easyIntervalDays: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Başlangıç ease %</span>
+              <input
+                className="input"
+                type="number"
+                min={130}
+                value={deckOptions.startingEasePercent}
+                onChange={(e) =>
+                  setDeckOptions({
+                    ...deckOptions,
+                    startingEasePercent: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+            <label className="field">
+              <span>Leech eşiği</span>
+              <input
+                className="input"
+                type="number"
+                min={1}
+                value={deckOptions.leechThreshold}
+                onChange={(e) =>
+                  setDeckOptions({
+                    ...deckOptions,
+                    leechThreshold: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+            <label className="field field--wide">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={deckOptions.suspendLeeches}
+                  onChange={(e) =>
+                    setDeckOptions({
+                      ...deckOptions,
+                      suspendLeeches: e.target.checked,
+                    })
+                  }
+                />{' '}
+                Leech kartları otomatik askıya al
+              </span>
+            </label>
+          </div>
+        ) : (
+          <div className="checks">
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.shuffleQuestions}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    shuffleQuestions: e.target.checked,
+                  })
+                }
+              />
+              Soruları karıştır
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.shuffleOptions}
+                onChange={(e) =>
+                  setSettings({ ...settings, shuffleOptions: e.target.checked })
+                }
+              />
+              Şıkları karıştır
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.showResultsImmediately}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    showResultsImmediately: e.target.checked,
+                  })
+                }
+              />
+              Bitince sonucu göster
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={settings.allowReview}
+                onChange={(e) =>
+                  setSettings({ ...settings, allowReview: e.target.checked })
+                }
+              />
+              Gözden geçirmeye izin ver
+            </label>
+            <label className="inline-field">
+              Süre (dk, boş=sınırsız)
+              <input
+                className="input input--sm"
+                type="number"
+                min={1}
+                value={settings.timeLimitMinutes ?? ''}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    timeLimitMinutes: e.target.value
+                      ? Number(e.target.value)
+                      : null,
+                  })
+                }
+              />
+            </label>
+            <label className="inline-field">
+              Geçme barajı %
+              <input
+                className="input input--sm"
+                type="number"
+                min={0}
+                max={100}
+                value={settings.passScorePercent}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    passScorePercent: Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+          </div>
+        )}
       </section>
 
       <section className="section">
@@ -377,13 +536,62 @@ export function EditorPage() {
           <>
             <div className="section__head">
               <h2>Kelime kartları ({cards.length})</h2>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => setCards((c) => [...c, emptyCard()])}
-              >
-                + Kart ekle
-              </button>
+              <div className="hero-actions">
+                <label className="btn btn--ghost btn--small">
+                  CSV içe aktar
+                  <input
+                    type="file"
+                    accept=".csv,text/csv,text/plain"
+                    hidden
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      const text = await f.text();
+                      const lines = text
+                        .split(/\r?\n/)
+                        .map((l) => l.trim())
+                        .filter(Boolean);
+                      const parsed: FlashCard[] = [];
+                      for (const line of lines) {
+                        const parts = line.includes('\t')
+                          ? line.split('\t')
+                          : line.split(/;|,/).map((p) => p.trim());
+                        if (parts.length < 2) continue;
+                        if (
+                          /^(front|ön|kelime)$/i.test(parts[0]) &&
+                          parsed.length === 0
+                        )
+                          continue;
+                        parsed.push({
+                          id: uid(),
+                          front: parts[0].replace(/^"|"$/g, ''),
+                          back: parts[1].replace(/^"|"$/g, ''),
+                          example: parts[2]?.replace(/^"|"$/g, '') ?? '',
+                          hint: parts[3]?.replace(/^"|"$/g, '') ?? '',
+                          tags: parts[4]
+                            ? parts[4].split('|').map((t) => t.trim())
+                            : [],
+                        });
+                      }
+                      if (parsed.length) {
+                        setCards((c) =>
+                          c.length === 1 && !c[0].front && !c[0].back
+                            ? parsed
+                            : [...c, ...parsed],
+                        );
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => setCards((c) => [...c, emptyCard()])}
+                >
+                  + Kart ekle
+                </button>
+              </div>
             </div>
             <div className="question-list">
               {cards.map((card, idx) => (
@@ -491,6 +699,45 @@ export function EditorPage() {
                           )
                         }
                         placeholder="I eat an apple every day."
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Etiketler (virgülle)</span>
+                      <input
+                        className="input"
+                        value={(card.tags ?? []).join(', ')}
+                        onChange={(e) =>
+                          setCards((cs) =>
+                            cs.map((c) =>
+                              c.id === card.id
+                                ? {
+                                    ...c,
+                                    tags: e.target.value
+                                      .split(',')
+                                      .map((t) => t.trim())
+                                      .filter(Boolean),
+                                  }
+                                : c,
+                            ),
+                          )
+                        }
+                        placeholder="yiyecek, A1"
+                      />
+                    </label>
+                    <label className="field field--wide">
+                      <span>Not</span>
+                      <input
+                        className="input"
+                        value={card.note ?? ''}
+                        onChange={(e) =>
+                          setCards((cs) =>
+                            cs.map((c) =>
+                              c.id === card.id
+                                ? { ...c, note: e.target.value }
+                                : c,
+                            ),
+                          )
+                        }
                       />
                     </label>
                   </div>

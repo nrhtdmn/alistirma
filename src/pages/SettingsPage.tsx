@@ -17,7 +17,7 @@ export function SettingsPage() {
       const r = await importBundle(file, mode);
       refresh();
       setMsg(
-        `İçe aktarıldı: ${r.users} kullanıcı, ${r.folders} klasör, ${r.items} içerik, ${r.attempts} sonuç.`,
+        `İçe aktarıldı: ${r.users} kullanıcı, ${r.folders} klasör, ${r.items} içerik, ${r.attempts} sonuç, ${r.cardReviews} kart ilerlemesi, ${r.reviewLogs} inceleme.`,
       );
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'İçe aktarma başarısız');
@@ -35,23 +35,17 @@ export function SettingsPage() {
     )
       return;
     if (!confirm('Bu işlem geri alınamaz. Son onay?')) return;
-    await db.transaction(
-      'rw',
-      db.users,
-      db.folders,
-      db.items,
-      db.attempts,
-      db.meta,
-      async () => {
-        await Promise.all([
-          db.users.clear(),
-          db.folders.clear(),
-          db.items.clear(),
-          db.attempts.clear(),
-          db.meta.clear(),
-        ]);
-      },
-    );
+    await db.transaction('rw', db.tables, async () => {
+      await Promise.all([
+        db.users.clear(),
+        db.folders.clear(),
+        db.items.clear(),
+        db.attempts.clear(),
+        db.cardReviews.clear(),
+        db.reviewLogs.clear(),
+        db.meta.clear(),
+      ]);
+    });
     window.location.reload();
   }
 

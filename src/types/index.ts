@@ -104,6 +104,95 @@ export interface FlashCard {
   example?: string;
   /** Telaffuz / ipucu */
   hint?: string;
+  /** Etiketler */
+  tags?: string[];
+  /** Ek not */
+  note?: string;
+}
+
+/** Anki tarzı deste ayarları */
+export interface CardDeckOptions {
+  /** Ters kart üret (anlam → kelime) */
+  enableReverse: boolean;
+  /** Günlük yeni kart limiti */
+  newPerDay: number;
+  /** Günlük tekrar limiti (0 = sınırsız) */
+  reviewsPerDay: number;
+  /** Öğrenme adımları (dakika) örn. 1, 10 */
+  learningStepsMinutes: number[];
+  /** Mezuniyet aralığı (gün) */
+  graduatingIntervalDays: number;
+  /** Easy ile mezuniyet aralığı (gün) */
+  easyIntervalDays: number;
+  /** Başlangıç ease % (250 = 2.5) */
+  startingEasePercent: number;
+  /** Easy bonusu (1.3 = %30) */
+  easyBonus: number;
+  /** Hard çarpanı */
+  hardIntervalFactor: number;
+  /** Interval modifier */
+  intervalModifier: number;
+  /** Maksimum aralık (gün) */
+  maxIntervalDays: number;
+  /** Leech eşiği (lapse sayısı) */
+  leechThreshold: number;
+  /** Leech olunca askıya al */
+  suspendLeeches: boolean;
+}
+
+export const DEFAULT_DECK_OPTIONS: CardDeckOptions = {
+  enableReverse: true,
+  newPerDay: 20,
+  reviewsPerDay: 200,
+  learningStepsMinutes: [1, 10],
+  graduatingIntervalDays: 1,
+  easyIntervalDays: 4,
+  startingEasePercent: 250,
+  easyBonus: 1.3,
+  hardIntervalFactor: 1.2,
+  intervalModifier: 1,
+  maxIntervalDays: 36500,
+  leechThreshold: 8,
+  suspendLeeches: true,
+};
+
+export type SrsCardState = 'new' | 'learning' | 'review' | 'relearning';
+export type CardDirection = 'forward' | 'reverse';
+export type SrsRating = 1 | 2 | 3 | 4; // Again Hard Good Easy
+
+export interface CardReviewState {
+  id: string;
+  userId: string;
+  itemId: string;
+  cardId: string;
+  direction: CardDirection;
+  state: SrsCardState;
+  easeFactor: number;
+  intervalDays: number;
+  repetitions: number;
+  lapses: number;
+  learningStep: number;
+  dueAt: number;
+  lastReviewedAt: number | null;
+  suspended: boolean;
+  buriedUntil: number | null;
+  isLeech: boolean;
+}
+
+export interface ReviewLogEntry {
+  id: string;
+  userId: string;
+  itemId: string;
+  cardId: string;
+  direction: CardDirection;
+  rating: SrsRating;
+  previousState: SrsCardState;
+  newState: SrsCardState;
+  previousInterval: number;
+  newInterval: number;
+  easeFactor: number;
+  reviewedAt: number;
+  timeTakenMs: number;
 }
 
 export interface ContentItem {
@@ -118,6 +207,7 @@ export interface ContentItem {
   questions: Question[];
   /** Kelime kartları (type === 'kartlar') */
   cards?: FlashCard[];
+  deckOptions?: CardDeckOptions;
   settings: ItemSettings;
   createdAt: number;
   updatedAt: number;
@@ -159,6 +249,8 @@ export interface ExportBundle {
   folders?: Folder[];
   items?: ContentItem[];
   attempts?: Attempt[];
+  cardReviews?: CardReviewState[];
+  reviewLogs?: ReviewLogEntry[];
 }
 
 export const DEFAULT_SETTINGS: ItemSettings = {

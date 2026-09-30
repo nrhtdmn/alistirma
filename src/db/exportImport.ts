@@ -3,12 +3,15 @@ import { db } from '../db/database';
 import type { ExportBundle } from '../types';
 
 export async function exportAll(): Promise<void> {
-  const [users, folders, items, attempts] = await Promise.all([
-    db.users.toArray(),
-    db.folders.toArray(),
-    db.items.toArray(),
-    db.attempts.toArray(),
-  ]);
+  const [users, folders, items, attempts, cardReviews, reviewLogs] =
+    await Promise.all([
+      db.users.toArray(),
+      db.folders.toArray(),
+      db.items.toArray(),
+      db.attempts.toArray(),
+      db.cardReviews.toArray(),
+      db.reviewLogs.toArray(),
+    ]);
   const bundle: ExportBundle = {
     version: 1,
     exportedAt: Date.now(),
@@ -17,6 +20,8 @@ export async function exportAll(): Promise<void> {
     folders,
     items,
     attempts,
+    cardReviews,
+    reviewLogs,
   };
   downloadJson(bundle, `alistirma-yedek-${dateStamp()}.json`);
 }
@@ -76,7 +81,14 @@ export type ImportMode = 'merge' | 'replace';
 export async function importBundle(
   file: File,
   mode: ImportMode = 'merge',
-): Promise<{ users: number; folders: number; items: number; attempts: number }> {
+): Promise<{
+  users: number;
+  folders: number;
+  items: number;
+  attempts: number;
+  cardReviews: number;
+  reviewLogs: number;
+}> {
   const text = await file.text();
   const data = JSON.parse(text) as ExportBundle;
   if (!data || data.version !== 1) {
@@ -84,41 +96,33 @@ export async function importBundle(
   }
 
   if (mode === 'replace') {
-    await db.transaction(
-      'rw',
-      db.users,
-      db.folders,
-      db.items,
-      db.attempts,
-      async () => {
-        await Promise.all([
-          db.users.clear(),
-          db.folders.clear(),
-          db.items.clear(),
-          db.attempts.clear(),
-        ]);
-      },
-    );
+    await db.transaction('rw', db.tables, async () => {
+      await Promise.all([
+        db.users.clear(),
+        db.folders.clear(),
+        db.items.clear(),
+        db.attempts.clear(),
+        db.cardReviews.clear(),
+        db.reviewLogs.clear(),
+      ]);
+    });
   }
 
   const users = data.users ?? [];
   const folders = data.folders ?? [];
   const items = data.items ?? [];
   const attempts = data.attempts ?? [];
+  const cardReviews = data.cardReviews ?? [];
+  const reviewLogs = data.reviewLogs ?? [];
 
-  await db.transaction(
-    'rw',
-    db.users,
-    db.folders,
-    db.items,
-    db.attempts,
-    async () => {
-      if (users.length) await db.users.bulkPut(users);
-      if (folders.length) await db.folders.bulkPut(folders);
-      if (items.length) await db.items.bulkPut(items);
-      if (attempts.length) await db.attempts.bulkPut(attempts);
-    },
-  );
+  await db.transaction('rw', db.tables, async () => {
+    if (users.length) await db.users.bulkPut(users);
+    if (folders.length) await db.folders.bulkPut(folders);
+    if (items.length) await db.items.bulkPut(items);
+    if (attempts.length) await db.attempts.bulkPut(attempts);
+    if (cardReviews.length) await db.cardReviews.bulkPut(cardReviews);
+    if (reviewLogs.length) await db.reviewLogs.bulkPut(reviewLogs);
+  });
 
   await db.meta.put({
     id: 'app',
@@ -131,6 +135,8 @@ export async function importBundle(
     folders: folders.length,
     items: items.length,
     attempts: attempts.length,
+    cardReviews: cardReviews.length,
+    reviewLogs: reviewLogs.length,
   };
 }
 

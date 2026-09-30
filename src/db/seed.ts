@@ -1,6 +1,6 @@
 import { db } from './database';
 import type { ContentItem, Folder, User } from '../types';
-import { DEFAULT_SETTINGS } from '../types';
+import { DEFAULT_DECK_OPTIONS, DEFAULT_SETTINGS } from '../types';
 import { uid } from '../utils/id';
 
 export async function ensureSeeded(): Promise<void> {
@@ -185,6 +185,7 @@ export async function ensureSeeded(): Promise<void> {
     subject: 'ingilizce',
     gradeLevel: '5. Sınıf',
     settings: { ...DEFAULT_SETTINGS, shuffleQuestions: true },
+    deckOptions: { ...DEFAULT_DECK_OPTIONS },
     createdAt: now,
     updatedAt: now,
     questions: [],

@@ -1,5 +1,13 @@
 import Dexie, { type Table } from 'dexie';
-import type { AppMeta, Attempt, ContentItem, Folder, User } from '../types';
+import type {
+  AppMeta,
+  Attempt,
+  CardReviewState,
+  ContentItem,
+  Folder,
+  ReviewLogEntry,
+  User,
+} from '../types';
 
 export class AlistirmaDB extends Dexie {
   users!: Table<User, string>;
@@ -7,6 +15,8 @@ export class AlistirmaDB extends Dexie {
   items!: Table<ContentItem, string>;
   attempts!: Table<Attempt, string>;
   meta!: Table<AppMeta, string>;
+  cardReviews!: Table<CardReviewState, string>;
+  reviewLogs!: Table<ReviewLogEntry, string>;
 
   constructor() {
     super('alistirma-db');
@@ -16,6 +26,15 @@ export class AlistirmaDB extends Dexie {
       items: 'id, folderId, ownerId, type, subject, updatedAt',
       attempts: 'id, itemId, userId, completedAt',
       meta: 'id',
+    });
+    this.version(2).stores({
+      users: 'id, name, role',
+      folders: 'id, parentId, ownerId, order',
+      items: 'id, folderId, ownerId, type, subject, updatedAt',
+      attempts: 'id, itemId, userId, completedAt',
+      meta: 'id',
+      cardReviews: 'id, userId, itemId, cardId, dueAt, state',
+      reviewLogs: 'id, userId, itemId, reviewedAt',
     });
   }
 }
