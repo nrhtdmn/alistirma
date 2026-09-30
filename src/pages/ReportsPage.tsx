@@ -4,11 +4,13 @@ import { useApp } from '../context/AppContext';
 import { exportAttempts } from '../db/exportImport';
 import { ROLE_LABELS, SUBJECT_LABELS, type SubjectKey } from '../types';
 import { formatDate, formatDuration, formatPercent } from '../utils/format';
+import { shareExamResult } from '../utils/shareExam';
 
 export function ReportsPage() {
   const { attempts, items, users, currentUser, deleteAttempt } = useApp();
   const [filterUser, setFilterUser] = useState<string>('all');
   const [filterItem, setFilterItem] = useState<string>('all');
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return attempts.filter((a) => {
@@ -77,6 +79,8 @@ export function ReportsPage() {
           </button>
         </div>
       </header>
+
+      {shareMsg && <p className="notice">{shareMsg}</p>}
 
       <section className="filters panel">
         <label className="field">
@@ -188,16 +192,49 @@ export function ReportsPage() {
                     </td>
                     <td>{formatDuration(a.durationSeconds)}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="btn btn--small btn--danger"
-                        onClick={async () => {
-                          if (!confirm('Bu sonuç silinsin mi?')) return;
-                          await deleteAttempt(a.id);
-                        }}
-                      >
-                        Sil
-                      </button>
+                      <div className="hero-actions">
+                        {item && (
+                          <button
+                            type="button"
+                            className="btn btn--small btn--primary"
+                            onClick={async () => {
+                              try {
+                                const mode = await shareExamResult(
+                                  item,
+                                  a,
+                                  user ?? null,
+                                );
+                                setShareMsg(
+                                  mode === 'shared'
+                                    ? 'Paylaşıldı.'
+                                    : mode === 'copied'
+                                      ? 'Panoya kopyalandı + dosya indirildi.'
+                                      : 'JSON indirildi.',
+                                );
+                              } catch (e) {
+                                if (
+                                  e instanceof Error &&
+                                  e.name === 'AbortError'
+                                )
+                                  return;
+                                setShareMsg('Paylaşım başarısız.');
+                              }
+                            }}
+                          >
+                            Paylaş
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn--small btn--danger"
+                          onClick={async () => {
+                            if (!confirm('Bu sonuç silinsin mi?')) return;
+                            await deleteAttempt(a.id);
+                          }}
+                        >
+                          Sil
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

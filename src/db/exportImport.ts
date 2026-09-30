@@ -1,6 +1,8 @@
 import { saveAs } from 'file-saver';
 import { db } from '../db/database';
-import type { ExportBundle } from '../types';
+import type { Attempt, ContentItem, ExportBundle } from '../types';
+import { DEFAULT_SETTINGS } from '../types';
+import type { ExamShareBundle } from '../utils/shareExam';
 
 export async function exportAll(): Promise<void> {
   const [users, folders, items, attempts, cardReviews, reviewLogs] =
@@ -90,7 +92,60 @@ export async function importBundle(
   reviewLogs: number;
 }> {
   const text = await file.text();
-  const data = JSON.parse(text) as ExportBundle;
+  const raw = JSON.parse(text) as ExportBundle | ExamShareBundle;
+
+  // Öğrencinin paylaştığı tek sınav sonucu
+  if (
+    raw &&
+    'kind' in raw &&
+    raw.kind === 'alistirma-sinav-sonucu' &&
+    raw.attempt
+  ) {
+    const attempt = raw.attempt as Attempt;
+    const snap = raw.itemSnapshot;
+    if (mode === 'replace') {
+      await db.transaction('rw', db.tables, async () => {
+        await Promise.all([
+          db.users.clear(),
+          db.folders.clear(),
+          db.items.clear(),
+          db.attempts.clear(),
+          db.cardReviews.clear(),
+          db.reviewLogs.clear(),
+        ]);
+      });
+    }
+    await db.transaction('rw', db.items, db.attempts, async () => {
+      if (snap && !(await db.items.get(snap.id))) {
+        const item: ContentItem = {
+          id: snap.id,
+          folderId: null,
+          ownerId: attempt.userId,
+          type: snap.type,
+          title: snap.title,
+          description: '',
+          subject: snap.subject,
+          gradeLevel: snap.gradeLevel,
+          questions: snap.questions,
+          settings: snap.settings ?? { ...DEFAULT_SETTINGS },
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        await db.items.put(item);
+      }
+      await db.attempts.put(attempt);
+    });
+    return {
+      users: 0,
+      folders: 0,
+      items: snap ? 1 : 0,
+      attempts: 1,
+      cardReviews: 0,
+      reviewLogs: 0,
+    };
+  }
+
+  const data = raw as ExportBundle;
   if (!data || data.version !== 1) {
     throw new Error('Geçersiz dosya formatı');
   }

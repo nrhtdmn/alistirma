@@ -8,6 +8,7 @@ import { ITEM_TYPE_LABELS, SUBJECT_LABELS } from '../types';
 import { formatDuration, formatPercent } from '../utils/format';
 import { uid } from '../utils/id';
 import { extractDrawing, extractTextAnswer, gradeAttempt, shuffle } from '../utils/scoring';
+import { shareExamResult } from '../utils/shareExam';
 
 export function TakePage() {
   const { id } = useParams();
@@ -19,6 +20,7 @@ export function TakePage() {
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [submitted, setSubmitted] = useState<Attempt | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
 
   const questions = useMemo(() => {
     if (!item) return [];
@@ -77,6 +79,21 @@ export function TakePage() {
     setSubmitted(attempt);
   }
 
+  async function handleShare(attempt: Attempt) {
+    if (!item) return;
+    setShareMsg(null);
+    try {
+      const mode = await shareExamResult(item, attempt, currentUser);
+      if (mode === 'shared') setShareMsg('Paylaşım menüsü açıldı / paylaşıldı.');
+      else if (mode === 'copied')
+        setShareMsg('Özet panoya kopyalandı, JSON dosyası indirildi.');
+      else setShareMsg('Sonuç JSON olarak indirildi.');
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return;
+      setShareMsg('Paylaşım tamamlanamadı; dosya indirmeyi dene.');
+    }
+  }
+
   if (!item) {
     return (
       <div className="page">
@@ -105,7 +122,14 @@ export function TakePage() {
             </p>
           </div>
           <div className="hero-actions">
-            <Link className="btn btn--primary" to="/raporlar">
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => void handleShare(submitted)}
+            >
+              Sonucu paylaş
+            </button>
+            <Link className="btn btn--ghost" to="/raporlar">
               Raporlara git
             </Link>
             <button
@@ -120,6 +144,8 @@ export function TakePage() {
             </Link>
           </div>
         </header>
+
+        {shareMsg && <p className="notice">{shareMsg}</p>}
 
         {item.settings.allowReview && (
           <section className="section">
@@ -180,10 +206,20 @@ export function TakePage() {
     return (
       <div className="page">
         <h1>Cevapların kaydedildi</h1>
-        <p className="muted">Sonuçlar hemen gösterilmiyor.</p>
-        <Link className="btn btn--primary" to="/raporlar">
-          Raporlar
-        </Link>
+        <p className="muted">Sonuçlar hemen gösterilmiyor; yine de paylaşabilirsin.</p>
+        {shareMsg && <p className="notice">{shareMsg}</p>}
+        <div className="hero-actions">
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => void handleShare(submitted)}
+          >
+            Sonucu paylaş
+          </button>
+          <Link className="btn btn--ghost" to="/raporlar">
+            Raporlar
+          </Link>
+        </div>
       </div>
     );
   }
