@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { DrawingPad } from '../components/DrawingPad';
 import { MathDisplay, MathInput } from '../components/MathField';
 import { useApp } from '../context/AppContext';
-import type { Attempt, Question } from '../types';
+import type { Attempt, HybridAnswer, Question } from '../types';
 import { ITEM_TYPE_LABELS, SUBJECT_LABELS } from '../types';
 import { formatDuration, formatPercent } from '../utils/format';
 import { uid } from '../utils/id';
-import { gradeAttempt, shuffle } from '../utils/scoring';
+import { extractDrawing, extractTextAnswer, gradeAttempt, shuffle } from '../utils/scoring';
 
 export function TakePage() {
   const { id } = useParams();
@@ -155,6 +156,13 @@ export function TakePage() {
                       {formatAnswer(rec?.value)} ·{' '}
                       {rec?.pointsEarned}/{q.points} puan
                     </p>
+                    {extractDrawing(rec?.value) && (
+                      <img
+                        className="answer-drawing"
+                        src={extractDrawing(rec?.value)}
+                        alt="El yazısı cevabı"
+                      />
+                    )}
                     {q.explanation && (
                       <p className="explain">{q.explanation}</p>
                     )}
@@ -222,10 +230,32 @@ export function TakePage() {
 
 function formatAnswer(value: unknown): string {
   if (value == null || value === '') return '—';
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return value.join(' → ');
-  if (typeof value === 'object') return JSON.stringify(value);
+  if (typeof value === 'string') {
+    if (value.startsWith('data:image')) return '[El yazısı]';
+    return value;
+  }
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'object') {
+    const h = value as HybridAnswer;
+    const parts: string[] = [];
+    if (h.text) parts.push(h.text);
+    if (h.drawing) parts.push('[El yazısı]');
+    if (parts.length) return parts.join(' · ');
+    return JSON.stringify(value);
+  }
   return String(value);
+}
+
+function asHybrid(value: unknown): HybridAnswer {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as HybridAnswer;
+  }
+  if (typeof value === 'string') {
+    if (value.startsWith('data:image')) return { drawing: value };
+    return { text: value };
+  }
+  return { text: '', drawing: '' };
 }
 
 function QuestionTaker({
@@ -239,6 +269,12 @@ function QuestionTaker({
   value: unknown;
   onChange: (v: unknown) => void;
 }) {
+  const hybrid = asHybrid(value);
+  const showPad =
+    question.type === 'el_yazisi' ||
+    question.type === 'matematik' ||
+    !!question.allowHandwriting;
+
   return (
     <article className="q-take">
       <header>
@@ -267,22 +303,98 @@ function QuestionTaker({
         </div>
       )}
 
+      {question.type === 'coklu_secim' && (
+        <div className="choice-list">
+          {(question.options ?? []).map((o) => {
+            const selected = (value as string[]) ?? [];
+            const checked = selected.includes(o.id);
+            return (
+              <label key={o.id} className="choice">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() =>
+                    onChange(
+                      checked
+                        ? selected.filter((id) => id !== o.id)
+                        : [...selected, o.id],
+                    )
+                  }
+                />
+                <span>{o.text}</span>
+              </label>
+            );
+          })}
+        </div>
+      )}
+
       {(question.type === 'bosluk_doldurma' ||
         question.type === 'acik_uclu') && (
         <textarea
           className="input"
           rows={question.type === 'acik_uclu' ? 4 : 2}
-          value={String(value ?? '')}
-          onChange={(e) => onChange(e.target.value)}
+          value={extractTextAnswer(value)}
+          onChange={(e) =>
+            onChange(
+              question.allowHandwriting
+                ? { ...hybrid, text: e.target.value }
+                : e.target.value,
+            )
+          }
           placeholder="Cevabını yaz…"
         />
       )}
 
       {question.type === 'matematik' && (
         <MathInput
-          value={String(value ?? '')}
-          onChange={onChange}
+          value={extractTextAnswer(value)}
+          onChange={(text) => onChange({ ...hybrid, text })}
           placeholder="Cevabı yaz (sayı veya LaTeX)"
+        />
+      )}
+
+      {question.type === 'sayisal' && (
+        <input
+          className="input"
+          type="number"
+          step="any"
+          value={extractTextAnswer(value)}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Sayısal cevap"
+        />
+      )}
+
+      {question.type === 'likert' && (
+        <div className="likert">
+          <span className="tiny muted">{question.likertMinLabel}</span>
+          <div className="likert-scale">
+            {Array.from(
+              {
+                length:
+                  (question.likertMax ?? 5) - (question.likertMin ?? 1) + 1,
+              },
+              (_, i) => (question.likertMin ?? 1) + i,
+            ).map((n) => (
+              <label key={n} className={`likert-opt ${value === n ? 'is-on' : ''}`}>
+                <input
+                  type="radio"
+                  name={question.id}
+                  checked={value === n}
+                  onChange={() => onChange(n)}
+                />
+                {n}
+              </label>
+            ))}
+          </div>
+          <span className="tiny muted">{question.likertMaxLabel}</span>
+        </div>
+      )}
+
+      {question.type === 'siniflandirma' && (
+        <ClassifyTaker
+          question={question}
+          value={(value as Record<string, string>) ?? {}}
+          onChange={onChange}
         />
       )}
 
@@ -300,7 +412,67 @@ function QuestionTaker({
           onChange={onChange}
         />
       )}
+
+      {showPad && (
+        <DrawingPad
+          label={
+            question.type === 'matematik'
+              ? 'Çözümü kalemle yaz'
+              : 'El yazısı / çizim alanı'
+          }
+          value={extractDrawing(value) || hybrid.drawing}
+          onChange={(drawing) => {
+            if (question.type === 'el_yazisi') {
+              onChange({ drawing });
+            } else if (
+              question.type === 'matematik' ||
+              question.allowHandwriting
+            ) {
+              onChange({ ...hybrid, drawing });
+            } else {
+              onChange(drawing);
+            }
+          }}
+        />
+      )}
     </article>
+  );
+}
+
+function ClassifyTaker({
+  question,
+  value,
+  onChange,
+}: {
+  question: Question;
+  value: Record<string, string>;
+  onChange: (v: Record<string, string>) => void;
+}) {
+  const items = useMemo(() => {
+    return shuffle([...(question.classifyItems ?? [])]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question.id]);
+
+  return (
+    <div className="classify-list">
+      {items.map((it) => (
+        <div key={it.id} className="option-row">
+          <span className="match-left">{it.text}</span>
+          <select
+            className="input"
+            value={value[it.id] ?? ''}
+            onChange={(e) => onChange({ ...value, [it.id]: e.target.value })}
+          >
+            <option value="">Kategori seç…</option>
+            {(question.categories ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
   );
 }
 

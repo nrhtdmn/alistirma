@@ -4,12 +4,17 @@ export type ItemType = 'alistirma' | 'sinav' | 'test' | 'quiz' | 'kartlar';
 
 export type QuestionType =
   | 'coktan_secmeli'
+  | 'coklu_secim'
   | 'dogru_yanlis'
   | 'bosluk_doldurma'
   | 'acik_uclu'
   | 'eslestirme'
   | 'siralama'
-  | 'matematik';
+  | 'matematik'
+  | 'sayisal'
+  | 'siniflandirma'
+  | 'likert'
+  | 'el_yazisi';
 
 export type SubjectKey =
   | 'turkce'
@@ -64,25 +69,45 @@ export interface MatchPair {
   right: string;
 }
 
+export interface ClassifyCategory {
+  id: string;
+  name: string;
+}
+
+export interface ClassifyItem {
+  id: string;
+  text: string;
+  categoryId: string;
+}
+
+/** Öğrenci cevabı: metin + isteğe bağlı kalem çizimi */
+export interface HybridAnswer {
+  text?: string;
+  drawing?: string;
+}
+
 export interface Question {
   id: string;
   type: QuestionType;
   prompt: string;
   points: number;
   explanation?: string;
-  /** Çoktan seçmeli / doğru-yanlış */
   options?: ChoiceOption[];
-  /** Boşluk doldurma / açık uçlu / matematik kabul edilen cevaplar */
   acceptedAnswers?: string[];
   caseSensitive?: boolean;
-  /** Eşleştirme */
   pairs?: MatchPair[];
-  /** Sıralama */
   orderItems?: string[];
-  /** Matematik: LaTeX gösterimi */
   latex?: string;
-  /** Görsel (base64) opsiyonel */
   imageData?: string;
+  numericAnswer?: number;
+  numericTolerance?: number;
+  categories?: ClassifyCategory[];
+  classifyItems?: ClassifyItem[];
+  likertMin?: number;
+  likertMax?: number;
+  likertMinLabel?: string;
+  likertMaxLabel?: string;
+  allowHandwriting?: boolean;
 }
 
 export interface ItemSettings {
@@ -279,12 +304,17 @@ export const ITEM_TYPE_LABELS: Record<ItemType, string> = {
 
 export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
   coktan_secmeli: 'Çoktan seçmeli',
+  coklu_secim: 'Çoklu seçim',
   dogru_yanlis: 'Doğru / Yanlış',
   bosluk_doldurma: 'Boşluk doldurma',
   acik_uclu: 'Açık uçlu',
   eslestirme: 'Eşleştirme',
   siralama: 'Sıralama',
   matematik: 'Matematik',
+  sayisal: 'Sayısal cevap',
+  siniflandirma: 'Sınıflandırma',
+  likert: 'Likert ölçeği',
+  el_yazisi: 'El yazısı / çizim',
 };
 
 export const SUBJECT_LABELS: Record<SubjectKey, string> = {

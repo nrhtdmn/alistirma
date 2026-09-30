@@ -1139,4 +1139,90 @@ p {
   .bar-row {
     grid-template-columns: 1fr;
   }
+
+  .anki-rates {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
+
+.drawing-pad {
+  margin-top: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.drawing-pad__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.drawing-pad__canvas {
+  width: 100%;
+  touch-action: none;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfdfb;
+  cursor: crosshair;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.color-pick {
+  width: 36px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  background: transparent;
+}
+
+.likert {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.likert-scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.likert-opt {
+  position: relative;
+  min-width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.likert-opt input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.likert-opt.is-on {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+  color: var(--teal);
+}
+
+.answer-drawing {
+  display: block;
+  max-width: 100%;
+  margin-top: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+

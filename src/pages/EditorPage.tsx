@@ -41,10 +41,10 @@ function emptyQuestion(type: QuestionType = 'coktan_secmeli'): Question {
     prompt: '',
     points: 10,
   };
-  if (type === 'coktan_secmeli') {
+  if (type === 'coktan_secmeli' || type === 'coklu_secim') {
     base.options = [
-      { id: uid(), text: '', isCorrect: true },
-      { id: uid(), text: '', isCorrect: false },
+      { id: uid(), text: '', isCorrect: type === 'coktan_secmeli' },
+      { id: uid(), text: '', isCorrect: type === 'coklu_secim' },
       { id: uid(), text: '', isCorrect: false },
       { id: uid(), text: '', isCorrect: false },
     ];
@@ -58,6 +58,13 @@ function emptyQuestion(type: QuestionType = 'coktan_secmeli'): Question {
   if (type === 'bosluk_doldurma' || type === 'acik_uclu' || type === 'matematik') {
     base.acceptedAnswers = [''];
   }
+  if (type === 'matematik') {
+    base.latex = '';
+    base.allowHandwriting = true;
+  }
+  if (type === 'acik_uclu') {
+    base.allowHandwriting = false;
+  }
   if (type === 'eslestirme') {
     base.pairs = [
       { id: uid(), left: '', right: '' },
@@ -67,8 +74,30 @@ function emptyQuestion(type: QuestionType = 'coktan_secmeli'): Question {
   if (type === 'siralama') {
     base.orderItems = ['', '', ''];
   }
-  if (type === 'matematik') {
-    base.latex = '';
+  if (type === 'sayisal') {
+    base.numericAnswer = 0;
+    base.numericTolerance = 0;
+  }
+  if (type === 'siniflandirma') {
+    const c1 = uid();
+    const c2 = uid();
+    base.categories = [
+      { id: c1, name: 'Grup A' },
+      { id: c2, name: 'Grup B' },
+    ];
+    base.classifyItems = [
+      { id: uid(), text: '', categoryId: c1 },
+      { id: uid(), text: '', categoryId: c2 },
+    ];
+  }
+  if (type === 'likert') {
+    base.likertMin = 1;
+    base.likertMax = 5;
+    base.likertMinLabel = 'Kesinlikle katılmıyorum';
+    base.likertMaxLabel = 'Kesinlikle katılıyorum';
+  }
+  if (type === 'el_yazisi') {
+    base.allowHandwriting = true;
   }
   return base;
 }
@@ -884,10 +913,12 @@ function QuestionEditor({
       )}
 
       {(question.type === 'coktan_secmeli' ||
-        question.type === 'dogru_yanlis') && (
+        question.type === 'dogru_yanlis' ||
+        question.type === 'coklu_secim') && (
         <OptionsEditor
           options={question.options ?? []}
           locked={question.type === 'dogru_yanlis'}
+          multi={question.type === 'coklu_secim'}
           onChange={(options) => onChange({ options })}
         />
       )}
@@ -906,6 +937,112 @@ function QuestionEditor({
               : 'Kabul edilen doğru cevaplar'
           }
         />
+      )}
+
+      {(question.type === 'matematik' || question.type === 'acik_uclu') && (
+        <label className="tiny">
+          <input
+            type="checkbox"
+            checked={!!question.allowHandwriting}
+            onChange={(e) =>
+              onChange({ allowHandwriting: e.target.checked })
+            }
+          />{' '}
+          Kalemle yazma alanı göster
+        </label>
+      )}
+
+      {question.type === 'sayisal' && (
+        <div className="form-grid">
+          <label className="field">
+            <span>Doğru sayı</span>
+            <input
+              className="input"
+              type="number"
+              step="any"
+              value={question.numericAnswer ?? 0}
+              onChange={(e) =>
+                onChange({ numericAnswer: Number(e.target.value) })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Tolerans (±)</span>
+            <input
+              className="input"
+              type="number"
+              step="any"
+              min={0}
+              value={question.numericTolerance ?? 0}
+              onChange={(e) =>
+                onChange({ numericTolerance: Number(e.target.value) })
+              }
+            />
+          </label>
+        </div>
+      )}
+
+      {question.type === 'siniflandirma' && (
+        <ClassifyEditor
+          categories={question.categories ?? []}
+          items={question.classifyItems ?? []}
+          onChange={(categories, classifyItems) =>
+            onChange({ categories, classifyItems })
+          }
+        />
+      )}
+
+      {question.type === 'likert' && (
+        <div className="form-grid">
+          <label className="field">
+            <span>Min</span>
+            <input
+              className="input"
+              type="number"
+              value={question.likertMin ?? 1}
+              onChange={(e) =>
+                onChange({ likertMin: Number(e.target.value) })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Max</span>
+            <input
+              className="input"
+              type="number"
+              value={question.likertMax ?? 5}
+              onChange={(e) =>
+                onChange({ likertMax: Number(e.target.value) })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Min etiketi</span>
+            <input
+              className="input"
+              value={question.likertMinLabel ?? ''}
+              onChange={(e) =>
+                onChange({ likertMinLabel: e.target.value })
+              }
+            />
+          </label>
+          <label className="field">
+            <span>Max etiketi</span>
+            <input
+              className="input"
+              value={question.likertMaxLabel ?? ''}
+              onChange={(e) =>
+                onChange({ likertMaxLabel: e.target.value })
+              }
+            />
+          </label>
+        </div>
+      )}
+
+      {question.type === 'el_yazisi' && (
+        <p className="muted tiny">
+          Öğrenci kalemle çizecek / yazacak. Değerlendirme manueldir.
+        </p>
       )}
 
       {question.type === 'eslestirme' && (
@@ -937,27 +1074,35 @@ function QuestionEditor({
 function OptionsEditor({
   options,
   locked,
+  multi,
   onChange,
 }: {
   options: ChoiceOption[];
   locked?: boolean;
+  multi?: boolean;
   onChange: (o: ChoiceOption[]) => void;
 }) {
   return (
     <div className="sub-block">
-      <span className="field-label">Şıklar</span>
+      <span className="field-label">
+        Şıklar {multi ? '(birden fazla doğru işaretleyin)' : ''}
+      </span>
       {options.map((o, i) => (
         <div key={o.id} className="option-row">
           <input
-            type="radio"
-            name={`correct-${options[0]?.id}`}
+            type={multi ? 'checkbox' : 'radio'}
+            name={multi ? o.id : `correct-${options[0]?.id}`}
             checked={!!o.isCorrect}
             onChange={() =>
               onChange(
-                options.map((x) => ({
-                  ...x,
-                  isCorrect: x.id === o.id,
-                })),
+                multi
+                  ? options.map((x) =>
+                      x.id === o.id ? { ...x, isCorrect: !x.isCorrect } : x,
+                    )
+                  : options.map((x) => ({
+                      ...x,
+                      isCorrect: x.id === o.id,
+                    })),
               )
             }
             title="Doğru şık"
@@ -1000,6 +1145,138 @@ function OptionsEditor({
           + Şık
         </button>
       )}
+    </div>
+  );
+}
+
+function ClassifyEditor({
+  categories,
+  items,
+  onChange,
+}: {
+  categories: { id: string; name: string }[];
+  items: { id: string; text: string; categoryId: string }[];
+  onChange: (
+    categories: { id: string; name: string }[],
+    items: { id: string; text: string; categoryId: string }[],
+  ) => void;
+}) {
+  return (
+    <div className="sub-block">
+      <span className="field-label">Kategoriler</span>
+      {categories.map((c) => (
+        <div key={c.id} className="option-row">
+          <input
+            className="input"
+            value={c.name}
+            onChange={(e) =>
+              onChange(
+                categories.map((x) =>
+                  x.id === c.id ? { ...x, name: e.target.value } : x,
+                ),
+                items,
+              )
+            }
+          />
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() => {
+              const nextCats = categories.filter((x) => x.id !== c.id);
+              const fallback = nextCats[0]?.id ?? '';
+              onChange(
+                nextCats,
+                items.map((it) =>
+                  it.categoryId === c.id
+                    ? { ...it, categoryId: fallback }
+                    : it,
+                ),
+              );
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn btn--small btn--ghost"
+        onClick={() =>
+          onChange(
+            [...categories, { id: uid(), name: `Grup ${categories.length + 1}` }],
+            items,
+          )
+        }
+      >
+        + Kategori
+      </button>
+
+      <span className="field-label" style={{ marginTop: '0.75rem' }}>
+        Maddeler (doğru kategori)
+      </span>
+      {items.map((it) => (
+        <div key={it.id} className="option-row">
+          <input
+            className="input"
+            value={it.text}
+            placeholder="Madde"
+            onChange={(e) =>
+              onChange(
+                categories,
+                items.map((x) =>
+                  x.id === it.id ? { ...x, text: e.target.value } : x,
+                ),
+              )
+            }
+          />
+          <select
+            className="input"
+            value={it.categoryId}
+            onChange={(e) =>
+              onChange(
+                categories,
+                items.map((x) =>
+                  x.id === it.id ? { ...x, categoryId: e.target.value } : x,
+                ),
+              )
+            }
+          >
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={() =>
+              onChange(
+                categories,
+                items.filter((x) => x.id !== it.id),
+              )
+            }
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="btn btn--small btn--ghost"
+        onClick={() =>
+          onChange(categories, [
+            ...items,
+            {
+              id: uid(),
+              text: '',
+              categoryId: categories[0]?.id ?? '',
+            },
+          ])
+        }
+      >
+        + Madde
+      </button>
     </div>
   );
 }
