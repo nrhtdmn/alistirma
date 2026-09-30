@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Modal } from '../components/Modal';
 import { useApp } from '../context/AppContext';
+import { importBundle } from '../db/exportImport';
 import {
   ITEM_TYPE_LABELS,
   type Assignment,
@@ -10,6 +11,7 @@ import {
 import { formatDate, formatPercent } from '../utils/format';
 import { uid } from '../utils/id';
 import { canAssign, isStudent } from '../utils/roles';
+import { shareAssignmentResults } from '../utils/shareAssignments';
 
 export function AssignmentsPage() {
   const {
@@ -20,10 +22,12 @@ export function AssignmentsPage() {
     assignments,
     saveAssignment,
     deleteAssignment,
+    refresh,
   } = useApp();
 
   const teacher = canAssign(currentUser);
   const student = isStudent(currentUser);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
@@ -31,6 +35,8 @@ export function AssignmentsPage() {
   const [due, setDue] = useState('');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const assignableItems = items;
 
@@ -46,6 +52,14 @@ export function AssignmentsPage() {
     }
     return assignments.filter((a) => a.studentIds.includes(currentUser.id));
   }, [assignments, currentUser, teacher]);
+
+  const studentDoneCount = useMemo(() => {
+    if (!currentUser || !student) return 0;
+    const ids = new Set(myAssignments.flatMap((a) => a.itemIds));
+    return attempts.filter(
+      (t) => t.userId === currentUser.id && ids.has(t.itemId),
+    ).length;
+  }, [attempts, currentUser, myAssignments, student]);
 
   function toggle(list: string[], id: string, setter: (v: string[]) => void) {
     setter(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -91,6 +105,85 @@ export function AssignmentsPage() {
     return { done, total: a.itemIds.length };
   }
 
+  async function handleShareAll() {
+    if (!currentUser || !student) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const mode = await shareAssignmentResults(
+        currentUser,
+        myAssignments,
+        items,
+        attempts,
+      );
+      if (mode === 'shared') setMsg('Atama sonuçların paylaşıldı.');
+      else if (mode === 'copied')
+        setMsg('Özet panoya kopyalandı, JSON dosyası indirildi.');
+      else setMsg('JSON dosyası indirildi — öğretmene gönder.');
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        /* iptal */
+      } else {
+        setMsg(e instanceof Error ? e.message : 'Paylaşım başarısız');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleShareOne(a: Assignment) {
+    if (!currentUser || !student) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const mode = await shareAssignmentResults(
+        currentUser,
+        [a],
+        items,
+        attempts,
+      );
+      if (mode === 'shared') setMsg(`“${a.title}” sonuçları paylaşıldı.`);
+      else if (mode === 'copied')
+        setMsg('Özet panoya kopyalandı, JSON dosyası indirildi.');
+      else setMsg('JSON dosyası indirildi — öğretmene gönder.');
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') {
+        /* iptal */
+      } else {
+        setMsg(e instanceof Error ? e.message : 'Paylaşım başarısız');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleImport(file: File) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await importBundle(file, 'merge');
+      refresh();
+      if (r.kind === 'atama-sonuclari') {
+        setMsg(
+          `${r.studentName} sonuçları alındı: ${r.attempts} deneme. Raporlar’da görebilirsin.`,
+        );
+      } else if (r.kind === 'sinav-sonucu') {
+        setMsg(
+          `${r.studentName ?? 'Öğrenci'} sınav sonucu alındı. Raporlar’da görebilirsin.`,
+        );
+      } else {
+        setMsg(
+          `İçe aktarıldı: ${r.attempts} sonuç, ${r.items} içerik, ${r.users} kullanıcı.`,
+        );
+      }
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : 'İçe aktarma başarısız');
+    } finally {
+      setBusy(false);
+      if (importRef.current) importRef.current.value = '';
+    }
+  }
+
   return (
     <div className="page">
       <header className="page-head">
@@ -99,20 +192,54 @@ export function AssignmentsPage() {
           <h1>{teacher ? 'Sınav atamaları' : 'Bana atananlar'}</h1>
           <p className="muted">
             {teacher
-              ? 'Bir veya birden fazla sınavı seçip öğrencilere ata.'
-              : 'Öğretmeninin sana verdiği sınav ve alıştırmalar.'}
+              ? 'Sınav ata; öğrencinin paylaştığı sonuç JSON’unu içe aktarıp gör.'
+              : 'Atananları çöz; bitince tüm sonuçlarını öğretmene paylaş.'}
           </p>
         </div>
-        {teacher && (
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => setOpen(true)}
-          >
-            + Atama yap
-          </button>
-        )}
+        <div className="hero-actions">
+          {teacher && (
+            <>
+              <input
+                ref={importRef}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleImport(f);
+                }}
+              />
+              <button
+                type="button"
+                className="btn btn--ghost"
+                disabled={busy}
+                onClick={() => importRef.current?.click()}
+              >
+                Sonuç içe aktar
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => setOpen(true)}
+              >
+                + Atama yap
+              </button>
+            </>
+          )}
+          {student && (
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={busy || studentDoneCount === 0}
+              onClick={() => void handleShareAll()}
+            >
+              Tüm sonuçları paylaş
+            </button>
+          )}
+        </div>
       </header>
+
+      {msg && <p className="notice">{msg}</p>}
 
       {myAssignments.length === 0 && (
         <p className="muted">Henüz atama yok.</p>
@@ -124,6 +251,13 @@ export function AssignmentsPage() {
           const assignedItems = a.itemIds
             .map((id) => items.find((i) => i.id === id))
             .filter(Boolean) as ContentItem[];
+          const mineDone = currentUser
+            ? a.itemIds.filter((id) =>
+                attempts.some(
+                  (t) => t.itemId === id && t.userId === currentUser.id,
+                ),
+              ).length
+            : 0;
 
           return (
             <article key={a.id} className="item-card">
@@ -140,7 +274,7 @@ export function AssignmentsPage() {
               <p className="tiny muted">
                 {teacher
                   ? `${a.studentIds.length} öğrenci · ${a.itemIds.length} içerik`
-                  : `Öğretmen: ${teacherUser?.name ?? '—'}`}
+                  : `Öğretmen: ${teacherUser?.name ?? '—'} · ${mineDone}/${a.itemIds.length} tamam`}
               </p>
 
               <ul className="plain-list">
@@ -199,6 +333,21 @@ export function AssignmentsPage() {
                     }
                   >
                     Başla
+                  </Link>
+                )}
+                {student && mineDone > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn--small btn--ghost"
+                    disabled={busy}
+                    onClick={() => void handleShareOne(a)}
+                  >
+                    Sonuçları paylaş
+                  </button>
+                )}
+                {teacher && (
+                  <Link className="btn btn--small btn--ghost" to="/raporlar">
+                    Raporlar
                   </Link>
                 )}
                 {teacher && (

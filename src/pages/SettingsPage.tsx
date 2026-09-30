@@ -31,7 +31,7 @@ export function SettingsPage() {
       const r = await importBundle(file, mode);
       refresh();
       setMsg(
-        `İçe aktarıldı: ${r.users} kullanıcı, ${r.folders} klasör, ${r.items} içerik, ${r.attempts} sonuç, ${r.cardReviews} kart ilerlemesi, ${r.reviewLogs} inceleme.`,
+        `İçe aktarıldı: ${r.users} kullanıcı, ${r.folders} klasör, ${r.items} içerik, ${r.attempts} sonuç, ${r.cardReviews} kart ilerlemesi, ${r.reviewLogs} inceleme${r.studentName ? ` (${r.studentName})` : ''}.`,
       );
     } catch (e) {
       setMsg(e instanceof Error ? e.message : 'İçe aktarma başarısız');

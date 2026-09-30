@@ -1,7 +1,8 @@
 import { saveAs } from 'file-saver';
 import { db } from '../db/database';
-import type { Attempt, ContentItem, ExportBundle } from '../types';
-import { DEFAULT_SETTINGS } from '../types';
+import type { Attempt, ContentItem, ExportBundle, User } from '../types';
+import { DEFAULT_SETTINGS, USER_COLORS } from '../types';
+import type { AssignmentResultsBundle } from '../utils/shareAssignments';
 import type { ExamShareBundle } from '../utils/shareExam';
 
 export async function exportAll(): Promise<void> {
@@ -92,11 +93,19 @@ export async function importBundle(
   attempts: number;
   cardReviews: number;
   reviewLogs: number;
+  kind?: string;
+  studentName?: string;
 }> {
   const text = await file.text();
-  const raw = JSON.parse(text) as ExportBundle | ExamShareBundle;
+  const raw = JSON.parse(text) as
+    | ExportBundle
+    | ExamShareBundle
+    | AssignmentResultsBundle;
 
-  // Öğrencinin paylaştığı tek sınav sonucu
+  if (raw && 'kind' in raw && raw.kind === 'alistirma-atama-sonuclari') {
+    return importAssignmentResults(raw as AssignmentResultsBundle, mode);
+  }
+
   if (
     raw &&
     'kind' in raw &&
@@ -105,20 +114,15 @@ export async function importBundle(
   ) {
     const attempt = raw.attempt as Attempt;
     const snap = raw.itemSnapshot;
+    const studentName =
+      'student' in raw && raw.student?.name ? raw.student.name : undefined;
     if (mode === 'replace') {
-      await db.transaction('rw', db.tables, async () => {
-        await Promise.all([
-          db.users.clear(),
-          db.folders.clear(),
-          db.items.clear(),
-          db.attempts.clear(),
-          db.cardReviews.clear(),
-          db.reviewLogs.clear(),
-          db.assignments.clear(),
-        ]);
-      });
+      await clearAllTables();
     }
-    await db.transaction('rw', db.items, db.attempts, async () => {
+    await db.transaction('rw', db.users, db.items, db.attempts, async () => {
+      if (studentName) {
+        await ensureStudentUser(attempt.userId, studentName);
+      }
       if (snap && !(await db.items.get(snap.id))) {
         const item: ContentItem = {
           id: snap.id,
@@ -139,12 +143,14 @@ export async function importBundle(
       await db.attempts.put(attempt);
     });
     return {
-      users: 0,
+      users: studentName ? 1 : 0,
       folders: 0,
       items: snap ? 1 : 0,
       attempts: 1,
       cardReviews: 0,
       reviewLogs: 0,
+      kind: 'sinav-sonucu',
+      studentName,
     };
   }
 
@@ -154,17 +160,7 @@ export async function importBundle(
   }
 
   if (mode === 'replace') {
-    await db.transaction('rw', db.tables, async () => {
-      await Promise.all([
-        db.users.clear(),
-        db.folders.clear(),
-        db.items.clear(),
-        db.attempts.clear(),
-        db.cardReviews.clear(),
-        db.reviewLogs.clear(),
-        db.assignments.clear(),
-      ]);
-    });
+    await clearAllTables();
   }
 
   const users = data.users ?? [];
@@ -199,6 +195,124 @@ export async function importBundle(
     cardReviews: cardReviews.length,
     reviewLogs: reviewLogs.length,
   };
+}
+
+async function importAssignmentResults(
+  bundle: AssignmentResultsBundle,
+  mode: ImportMode,
+): Promise<{
+  users: number;
+  folders: number;
+  items: number;
+  attempts: number;
+  cardReviews: number;
+  reviewLogs: number;
+  kind: string;
+  studentName: string;
+}> {
+  if (mode === 'replace') {
+    await clearAllTables();
+  }
+
+  const now = Date.now();
+  await db.transaction(
+    'rw',
+    db.users,
+    db.items,
+    db.attempts,
+    db.assignments,
+    async () => {
+      await ensureStudentUser(
+        bundle.student.id,
+        bundle.student.name,
+        bundle.student.color,
+        bundle.student.role,
+      );
+
+      for (const snap of bundle.items) {
+        const existing = await db.items.get(snap.id);
+        if (!existing) {
+          const item: ContentItem = {
+            id: snap.id,
+            folderId: null,
+            ownerId: bundle.student.id,
+            type: snap.type,
+            title: snap.title,
+            description: snap.description ?? '',
+            subject: snap.subject,
+            gradeLevel: snap.gradeLevel,
+            questions: snap.questions ?? [],
+            cards: snap.cards,
+            cardKind: snap.cardKind,
+            deckOptions: snap.deckOptions,
+            settings: snap.settings ?? { ...DEFAULT_SETTINGS },
+            createdAt: now,
+            updatedAt: now,
+          };
+          await db.items.put(item);
+        }
+      }
+
+      if (bundle.attempts.length) {
+        await db.attempts.bulkPut(bundle.attempts);
+      }
+
+      if (bundle.assignments?.length) {
+        for (const a of bundle.assignments) {
+          const existing = await db.assignments.get(a.id);
+          if (existing) {
+            const studentIds = existing.studentIds.includes(bundle.student.id)
+              ? existing.studentIds
+              : [...existing.studentIds, bundle.student.id];
+            await db.assignments.put({ ...existing, studentIds });
+          }
+        }
+      }
+    },
+  );
+
+  return {
+    users: 1,
+    folders: 0,
+    items: bundle.items.length,
+    attempts: bundle.attempts.length,
+    cardReviews: 0,
+    reviewLogs: 0,
+    kind: 'atama-sonuclari',
+    studentName: bundle.student.name,
+  };
+}
+
+async function ensureStudentUser(
+  id: string,
+  name: string,
+  color?: string,
+  role: User['role'] = 'ogrenci',
+) {
+  const existing = await db.users.get(id);
+  if (existing) return;
+  const user: User = {
+    id,
+    name,
+    role,
+    color: color ?? USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)],
+    createdAt: Date.now(),
+  };
+  await db.users.put(user);
+}
+
+async function clearAllTables() {
+  await db.transaction('rw', db.tables, async () => {
+    await Promise.all([
+      db.users.clear(),
+      db.folders.clear(),
+      db.items.clear(),
+      db.attempts.clear(),
+      db.cardReviews.clear(),
+      db.reviewLogs.clear(),
+      db.assignments.clear(),
+    ]);
+  });
 }
 
 async function collectFolderAncestors(folderIds: string[]) {
